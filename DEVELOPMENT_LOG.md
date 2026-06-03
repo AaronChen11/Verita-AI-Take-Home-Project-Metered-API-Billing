@@ -83,3 +83,34 @@ Auth, security helpers, and database connection code were split into separate fi
 ### Limitations
 
 The middleware is not wired into real routes yet because the ingestion and ops endpoints have not been implemented. Database-backed API key lookup still needs a repository implementation once seed data and route handlers are added.
+
+## 2026-06-03: Batched Usage Event Ingestion
+
+### Implemented
+
+* Added `POST /v1/events` route construction in `backend/src/routes/events.ts`.
+* Added payload validation for batched events with `request_id`, `api_key_id`, `endpoint`, `units`, and `timestamp`.
+* Added tenant ownership validation so a customer cannot submit usage under another customer's API key.
+* Added Postgres-backed API key repository in `backend/src/repositories/apiKeys.ts`.
+* Added Postgres-backed usage event repository in `backend/src/repositories/usageEvents.ts`.
+* Implemented usage event insertion with `ON CONFLICT (request_id) DO NOTHING`.
+* Wired the ingestion route into app construction and production startup dependencies.
+* Added route-level tests for valid ingestion, duplicate accounting, missing customer context, cross-tenant API key rejection, and invalid payloads.
+
+### Design Notes
+
+The ingestion route keeps HTTP validation separate from database writes. The route verifies API key ownership before attempting inserts, while the repository relies on the database `usage_events.request_id` unique constraint for idempotency under retries and concurrent re-delivery.
+
+Duplicate handling is intentionally not treated as a request failure. The repository returns the number of rows inserted, and the route reports `accepted` and `duplicates`, matching the desired idempotent ingestion behavior.
+
+The route and repositories are separate files because ingestion will become a correctness boundary with tests, database behavior, and later aggregation dependencies. Keeping these responsibilities split avoids making `app.ts` or the auth middleware responsible for billing write semantics.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+The route is wired to application construction, but full end-to-end HTTP verification against a real Postgres database still depends on running Docker locally. The current tests use fake repositories to validate route behavior without requiring database connectivity.
