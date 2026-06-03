@@ -3,6 +3,8 @@ import type { Request, RequestHandler, Response } from "express";
 
 import type { EventsRouteDependencies } from "./routes/events.js";
 import { createEventsRouter } from "./routes/events.js";
+import type { InvoiceRouteDependencies } from "./routes/invoices.js";
+import { createInvoicesRouter } from "./routes/invoices.js";
 import type { UsageRouteDependencies } from "./routes/usage.js";
 import { createUsageRouter } from "./routes/usage.js";
 
@@ -14,6 +16,7 @@ export type AppDependencies = {
   customerApi?: {
     auth: RequestHandler;
     events: EventsRouteDependencies;
+    invoices: InvoiceRouteDependencies;
     usage: UsageRouteDependencies;
   };
 };
@@ -29,6 +32,7 @@ export function createApp(dependencies: AppDependencies = {}) {
       "/v1",
       dependencies.customerApi.auth,
       createEventsRouter(dependencies.customerApi.events),
+      createInvoicesRouter(dependencies.customerApi.invoices),
       createUsageRouter(dependencies.customerApi.usage),
     );
   }

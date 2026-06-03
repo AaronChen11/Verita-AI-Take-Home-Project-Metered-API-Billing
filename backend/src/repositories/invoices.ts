@@ -30,8 +30,147 @@ export type InvoiceGenerationRepository = {
   createDraftInvoiceIfNotExists(input: InvoiceCreateInput): Promise<InvoiceCreateResult>;
 };
 
-export class PostgresInvoiceRepository implements InvoiceGenerationRepository {
+export type CustomerInvoiceSummary = {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+  subtotalCents: number;
+  creditsCents: number;
+  totalCents: number;
+  issuedAt: Date | null;
+  paidAt: Date | null;
+  createdAt: Date;
+};
+
+export type CustomerInvoiceLineItem = {
+  id: string;
+  description: string;
+  units: number;
+  unitPriceMicros: number;
+  amountCents: number;
+  isOverridden: boolean;
+};
+
+export type CustomerInvoiceCredit = {
+  id: string;
+  amountCents: number;
+  reason: string;
+  createdBy: string;
+  createdAt: Date;
+};
+
+export type CustomerInvoiceDetail = CustomerInvoiceSummary & {
+  lineItems: CustomerInvoiceLineItem[];
+  credits: CustomerInvoiceCredit[];
+};
+
+export type InvoiceListCursor = {
+  createdAt: Date;
+  id: string;
+};
+
+export type CustomerInvoiceReadRepository = {
+  listForCustomer(customerId: string, limit: number, cursor?: InvoiceListCursor): Promise<CustomerInvoiceSummary[]>;
+  findForCustomer(customerId: string, invoiceId: string): Promise<CustomerInvoiceDetail | undefined>;
+};
+
+export class PostgresInvoiceRepository implements InvoiceGenerationRepository, CustomerInvoiceReadRepository {
   constructor(private readonly pool: Pool) {}
+
+  async listForCustomer(customerId: string, limit: number, cursor?: InvoiceListCursor) {
+    const cursorFilter = cursor ? "AND (created_at, id) < ($3, $4)" : "";
+    const values = cursor ? [customerId, limit, cursor.createdAt, cursor.id] : [customerId, limit];
+    const result = await this.pool.query<InvoiceRow>(
+      `
+        SELECT
+          id,
+          period_start,
+          period_end,
+          status,
+          subtotal_cents,
+          credits_cents,
+          total_cents,
+          issued_at,
+          paid_at,
+          created_at
+        FROM invoices
+        WHERE customer_id = $1
+          ${cursorFilter}
+        ORDER BY created_at DESC, id DESC
+        LIMIT $2
+      `,
+      values,
+    );
+
+    return result.rows.map(toInvoiceSummary);
+  }
+
+  async findForCustomer(customerId: string, invoiceId: string) {
+    const invoiceResult = await this.pool.query<InvoiceRow>(
+      `
+        SELECT
+          id,
+          period_start,
+          period_end,
+          status,
+          subtotal_cents,
+          credits_cents,
+          total_cents,
+          issued_at,
+          paid_at,
+          created_at
+        FROM invoices
+        WHERE customer_id = $1
+          AND id = $2
+        LIMIT 1
+      `,
+      [customerId, invoiceId],
+    );
+    const invoice = invoiceResult.rows[0];
+
+    if (!invoice) {
+      return undefined;
+    }
+
+    const [lineItemsResult, creditsResult] = await Promise.all([
+      this.pool.query<InvoiceLineItemRow>(
+        `
+          SELECT
+            id,
+            description,
+            units,
+            unit_price_micros,
+            amount_cents,
+            is_overridden
+          FROM invoice_line_items
+          WHERE invoice_id = $1
+          ORDER BY created_at ASC, id ASC
+        `,
+        [invoiceId],
+      ),
+      this.pool.query<InvoiceCreditRow>(
+        `
+          SELECT
+            id,
+            amount_cents,
+            reason,
+            created_by,
+            created_at
+          FROM credits
+          WHERE invoice_id = $1
+          ORDER BY created_at ASC, id ASC
+        `,
+        [invoiceId],
+      ),
+    ]);
+
+    return {
+      ...toInvoiceSummary(invoice),
+      lineItems: lineItemsResult.rows.map(toInvoiceLineItem),
+      credits: creditsResult.rows.map(toInvoiceCredit),
+    };
+  }
 
   async listCustomerUsageForPeriod(period: BillingPeriod) {
     const result = await this.pool.query<CustomerUsageRow>(
@@ -118,6 +257,80 @@ type CustomerUsageRow = {
     unitPriceMicros: number | string;
   }>;
 };
+
+type InvoiceRow = {
+  id: string;
+  period_start: Date | string;
+  period_end: Date | string;
+  status: string;
+  subtotal_cents: number;
+  credits_cents: number;
+  total_cents: number;
+  issued_at: Date | null;
+  paid_at: Date | null;
+  created_at: Date;
+};
+
+type InvoiceLineItemRow = {
+  id: string;
+  description: string;
+  units: number;
+  unit_price_micros: number | string;
+  amount_cents: number;
+  is_overridden: boolean;
+};
+
+type InvoiceCreditRow = {
+  id: string;
+  amount_cents: number;
+  reason: string;
+  created_by: string;
+  created_at: Date;
+};
+
+function toInvoiceSummary(row: InvoiceRow): CustomerInvoiceSummary {
+  return {
+    id: row.id,
+    periodStart: toDateOnly(row.period_start),
+    periodEnd: toDateOnly(row.period_end),
+    status: row.status,
+    subtotalCents: row.subtotal_cents,
+    creditsCents: row.credits_cents,
+    totalCents: row.total_cents,
+    issuedAt: row.issued_at,
+    paidAt: row.paid_at,
+    createdAt: row.created_at,
+  };
+}
+
+function toInvoiceLineItem(row: InvoiceLineItemRow): CustomerInvoiceLineItem {
+  return {
+    id: row.id,
+    description: row.description,
+    units: row.units,
+    unitPriceMicros: Number(row.unit_price_micros),
+    amountCents: row.amount_cents,
+    isOverridden: row.is_overridden,
+  };
+}
+
+function toInvoiceCredit(row: InvoiceCreditRow): CustomerInvoiceCredit {
+  return {
+    id: row.id,
+    amountCents: row.amount_cents,
+    reason: row.reason,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+  };
+}
+
+function toDateOnly(value: Date | string) {
+  if (typeof value === "string") {
+    return value.slice(0, 10);
+  }
+
+  return value.toISOString().slice(0, 10);
+}
 
 async function insertInvoice(client: PoolClient, input: InvoiceCreateInput) {
   const totalCents = input.subtotalCents;

@@ -41,6 +41,16 @@ describe("createApp", () => {
             },
           },
         },
+        invoices: {
+          invoices: {
+            async listForCustomer() {
+              return [];
+            },
+            async findForCustomer() {
+              return undefined;
+            },
+          },
+        },
         usage: {
           apiKeys: {
             async findActiveIdsForCustomer() {

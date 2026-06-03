@@ -205,3 +205,33 @@ The database unique constraint on `(customer_id, period_start, period_end)` is t
 ### Limitations
 
 The job service is implemented but does not yet have a CLI or scheduler entrypoint. It also creates draft invoices only; issuing invoices, customer invoice read APIs, credits, overrides, and payment webhooks still need to be implemented.
+
+## 2026-06-03: Customer Invoice Read APIs
+
+### Implemented
+
+* Added `GET /v1/invoices` in `backend/src/routes/invoices.ts`.
+* Added `GET /v1/invoices/:id` in `backend/src/routes/invoices.ts`.
+* Added customer-scoped invoice list and detail repository methods in `backend/src/repositories/invoices.ts`.
+* Returned invoice line items and credits on invoice detail.
+* Added cursor pagination for invoice listing.
+* Wired invoice routes into the authenticated customer `/v1` API.
+* Added route and repository tests for customer scoping, list pagination, detail lookup, and not-found behavior.
+
+### Design Notes
+
+Customer invoice reads are scoped by `customer_id` inside the repository methods, not by route-level ID checks alone. The detail endpoint returns 404 when a customer requests an invoice ID outside their tenant, which avoids confirming that another tenant's invoice exists.
+
+Invoice detail returns financial components together: invoice summary fields, line items, and credits. This keeps the customer dashboard and future ops views aligned on the same invoice shape.
+
+Invoice list pagination uses a composite cursor of `(created_at, id)` to match the `ORDER BY created_at DESC, id DESC` sort. This avoids skipping or duplicating invoices when multiple invoices share the same creation timestamp.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+The endpoints are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. Invoice issuing, paid status transitions, credit issuance, line-item override, and payment webhooks are still pending.

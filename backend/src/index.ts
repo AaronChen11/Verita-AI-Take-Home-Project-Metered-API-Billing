@@ -5,11 +5,13 @@ import { createCustomerAuthMiddleware } from "./auth/customerAuth.js";
 import { env } from "./config/env.js";
 import { getPool } from "./db/pool.js";
 import { PostgresApiKeyRepository } from "./repositories/apiKeys.js";
+import { PostgresInvoiceRepository } from "./repositories/invoices.js";
 import { PostgresUsageEventRepository } from "./repositories/usageEvents.js";
 import { PostgresUsageReadRepository } from "./repositories/usageRead.js";
 
 const pool = getPool();
 const apiKeys = new PostgresApiKeyRepository(pool);
+const invoices = new PostgresInvoiceRepository(pool);
 const usageEvents = new PostgresUsageEventRepository(pool);
 const usageRead = new PostgresUsageReadRepository(pool);
 
@@ -19,6 +21,9 @@ const app = createApp({
     events: {
       apiKeys,
       usageEvents,
+    },
+    invoices: {
+      invoices,
     },
     usage: {
       apiKeys,
