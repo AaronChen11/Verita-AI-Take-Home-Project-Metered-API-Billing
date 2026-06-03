@@ -4,6 +4,12 @@ import { z } from "zod";
 
 import type { CreditRepository } from "../repositories/credits.js";
 import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
+import type { LineItemOverrideRepository } from "../repositories/lineItemOverrides.js";
+import {
+  OverrideInvoiceNotFoundError,
+  OverrideLineItemNotFoundError,
+  OverridePaidInvoiceError,
+} from "../repositories/lineItemOverrides.js";
 import type {
   OpsAuditLogEntry,
   OpsCustomerDetail,
@@ -26,6 +32,11 @@ const customerIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const lineItemOverrideParamsSchema = z.object({
+  invoiceId: z.string().uuid(),
+  lineItemId: z.string().uuid(),
+});
+
 const issueCreditBodySchema = z.object({
   invoice_id: z.string().uuid(),
   amount_cents: z.number().int().positive(),
@@ -33,9 +44,15 @@ const issueCreditBodySchema = z.object({
   idempotency_key: z.string().trim().min(1),
 });
 
+const overrideLineItemBodySchema = z.object({
+  amount_cents: z.number().int().nonnegative(),
+  reason: z.string().trim().min(1),
+});
+
 export type OpsRouteDependencies = {
   opsReads: OpsReadRepository;
   credits: CreditRepository;
+  lineItemOverrides: LineItemOverrideRepository;
 };
 
 export function createListOpsCustomersHandler(dependencies: OpsRouteDependencies) {
@@ -128,12 +145,66 @@ export function createIssueCreditHandler(dependencies: OpsRouteDependencies) {
   };
 }
 
+export function createOverrideLineItemHandler(dependencies: OpsRouteDependencies) {
+  return async function overrideLineItem(req: Request, res: Response) {
+    if (!req.ops?.actor) {
+      res.status(400).json({ error: "missing_ops_actor" });
+      return;
+    }
+
+    const params = lineItemOverrideParamsSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "invalid_line_item_override_params" });
+      return;
+    }
+
+    const parsedBody = overrideLineItemBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      res.status(400).json({ error: "invalid_line_item_override_request", details: parsedBody.error.flatten() });
+      return;
+    }
+
+    try {
+      const result = await dependencies.lineItemOverrides.overrideLineItem({
+        invoiceId: params.data.invoiceId,
+        lineItemId: params.data.lineItemId,
+        amountCents: parsedBody.data.amount_cents,
+        reason: parsedBody.data.reason,
+        actor: req.ops.actor,
+      });
+
+      res.json({
+        data: {
+          line_item: {
+            id: result.lineItem.id,
+            amount_cents: result.lineItem.amountCents,
+            is_overridden: result.lineItem.isOverridden,
+          },
+          invoice: serializeInvoiceTotals(result.invoice),
+        },
+      });
+    } catch (error) {
+      if (error instanceof OverridePaidInvoiceError) {
+        res.status(409).json({ error: "paid_invoice_cannot_be_overridden" });
+        return;
+      }
+      if (error instanceof OverrideInvoiceNotFoundError || error instanceof OverrideLineItemNotFoundError) {
+        res.status(404).json({ error: "line_item_not_found" });
+        return;
+      }
+
+      throw error;
+    }
+  };
+}
+
 export function createOpsRouter(dependencies: OpsRouteDependencies) {
   const router = Router();
 
   router.get("/customers", createListOpsCustomersHandler(dependencies));
   router.get("/customers/:id", createGetOpsCustomerHandler(dependencies));
   router.post("/customers/:id/credits", createIssueCreditHandler(dependencies));
+  router.patch("/invoices/:invoiceId/line-items/:lineItemId", createOverrideLineItemHandler(dependencies));
 
   return router;
 }

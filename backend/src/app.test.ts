@@ -122,6 +122,11 @@ describe("createApp", () => {
               throw new Error("not used");
             },
           },
+          lineItemOverrides: {
+            async overrideLineItem() {
+              throw new Error("not used");
+            },
+          },
           opsReads: {
             async listCustomers() {
               calls.push("list-customers");

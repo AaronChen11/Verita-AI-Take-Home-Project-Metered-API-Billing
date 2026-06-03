@@ -334,3 +334,38 @@ Duplicate credit requests use `(customer_id, idempotency_key)` as the idempotenc
 ### Limitations
 
 The route and repository are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. Credits cannot exceed invoice subtotal at the invoice total level because totals are clamped to zero, but the MVP does not yet enforce a business rejection for over-crediting.
+
+## 2026-06-03: Ops Line-Item Overrides
+
+### Implemented
+
+* Added `PATCH /ops/invoices/:invoiceId/line-items/:lineItemId` in `backend/src/routes/ops.ts`.
+* Required `X-Ops-Actor` for line-item overrides.
+* Required `amount_cents` and `reason`.
+* Added line-item override repository in `backend/src/repositories/lineItemOverrides.ts`.
+* Locked the target invoice and line item before mutation.
+* Allowed overrides for `draft` and `issued` invoices.
+* Rejected direct overrides for `paid` invoices.
+* Updated line-item override metadata: `is_overridden`, `overridden_at`, `override_reason`, and `overridden_by`.
+* Recalculated invoice `subtotal_cents` and `total_cents` transactionally.
+* Wrote an immutable audit log entry with before and after snapshots.
+* Added route and repository tests for actor enforcement, paid invoice rejection, missing line items, total recalculation, and audit logging.
+
+### Design Notes
+
+Line-item override is a money-moving ops action, so it requires `X-Ops-Actor` and a reason. The actor becomes the audit actor and the `overridden_by` value on the line item.
+
+Paid invoices reject direct line-item mutation. Corrections after payment should go through credits or a future correction flow so finalized financial records are not silently rewritten.
+
+Invoice totals are recalculated from all line items after the override, then credits are applied with a zero floor on total cents. This keeps override behavior consistent with credit recalculation and avoids stale invoice totals.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The route and repository are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. The MVP does not keep historical versions of line items beyond audit log before/after snapshots.

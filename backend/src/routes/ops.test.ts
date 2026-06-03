@@ -5,14 +5,21 @@ import {
   createGetOpsCustomerHandler,
   createIssueCreditHandler,
   createListOpsCustomersHandler,
+  createOverrideLineItemHandler,
   encodeOpsCustomerCursor,
 } from "./ops.js";
 import type { OpsRouteDependencies } from "./ops.js";
 import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
+import {
+  OverrideInvoiceNotFoundError,
+  OverrideLineItemNotFoundError,
+  OverridePaidInvoiceError,
+} from "../repositories/lineItemOverrides.js";
 import type { OpsCustomerDetail, OpsCustomerSummary, OpsCustomerListCursor } from "../repositories/opsReads.js";
 
 const customerId = "00000000-0000-4000-8000-000000000001";
 const invoiceId = "00000000-0000-4000-8000-000000000010";
+const lineItemId = "00000000-0000-4000-8000-000000000011";
 
 function createResponse() {
   const output: { status?: number; body?: unknown } = {};
@@ -50,6 +57,8 @@ function createDependencies(options?: {
   detailFound?: boolean;
   duplicateCredit?: boolean;
   invoiceNotFound?: boolean;
+  lineItemNotFound?: boolean;
+  paidInvoice?: boolean;
 }) {
   const calls: Array<{
     method: string;
@@ -57,6 +66,7 @@ function createDependencies(options?: {
     cursor?: OpsCustomerListCursor;
     customerId?: string;
     credit?: unknown;
+    override?: unknown;
   }> = [];
   const dependencies: OpsRouteDependencies = {
     credits: {
@@ -74,6 +84,34 @@ function createDependencies(options?: {
             subtotalCents: 10_000,
             creditsCents: 500,
             totalCents: 9_500,
+          },
+        };
+      },
+    },
+    lineItemOverrides: {
+      async overrideLineItem(input) {
+        calls.push({ method: "override", override: input });
+        if (options?.paidInvoice) {
+          throw new OverridePaidInvoiceError(input.invoiceId);
+        }
+        if (options?.invoiceNotFound) {
+          throw new OverrideInvoiceNotFoundError(input.invoiceId);
+        }
+        if (options?.lineItemNotFound) {
+          throw new OverrideLineItemNotFoundError(input.lineItemId);
+        }
+
+        return {
+          lineItem: {
+            id: input.lineItemId,
+            amountCents: input.amountCents,
+            isOverridden: true,
+          },
+          invoice: {
+            id: input.invoiceId,
+            subtotalCents: 8_000,
+            creditsCents: 500,
+            totalCents: 7_500,
           },
         };
       },
@@ -188,6 +226,92 @@ describe("GET /ops/customers handler", () => {
   });
 });
 
+describe("PATCH /ops/invoices/:invoiceId/line-items/:lineItemId handler", () => {
+  it("requires an ops actor", async () => {
+    const { dependencies } = createDependencies();
+    const handler = createOverrideLineItemHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: overrideParams(), body: overrideBody() }), response);
+
+    expect(output).toEqual({ status: 400, body: { error: "missing_ops_actor" } });
+  });
+
+  it("overrides a line item and returns recalculated invoice totals", async () => {
+    const { calls, dependencies } = createDependencies();
+    const handler = createOverrideLineItemHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: overrideParams(), body: overrideBody(), actor: "ops@example.com" }), response);
+
+    expect(calls[0]).toMatchObject({
+      method: "override",
+      override: {
+        invoiceId,
+        lineItemId,
+        amountCents: 8_000,
+        reason: "Contract correction",
+        actor: "ops@example.com",
+      },
+    });
+    expect(output).toEqual({
+      body: {
+        data: {
+          line_item: {
+            id: lineItemId,
+            amount_cents: 8_000,
+            is_overridden: true,
+          },
+          invoice: {
+            id: invoiceId,
+            subtotal_cents: 8_000,
+            credits_cents: 500,
+            total_cents: 7_500,
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects paid invoice overrides", async () => {
+    const { dependencies } = createDependencies({ paidInvoice: true });
+    const handler = createOverrideLineItemHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: overrideParams(), body: overrideBody(), actor: "ops@example.com" }), response);
+
+    expect(output).toEqual({ status: 409, body: { error: "paid_invoice_cannot_be_overridden" } });
+  });
+
+  it("returns 404 when the invoice or line item cannot be found", async () => {
+    const { dependencies } = createDependencies({ lineItemNotFound: true });
+    const handler = createOverrideLineItemHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: overrideParams(), body: overrideBody(), actor: "ops@example.com" }), response);
+
+    expect(output).toEqual({ status: 404, body: { error: "line_item_not_found" } });
+  });
+
+  it("rejects invalid override requests", async () => {
+    const { dependencies } = createDependencies();
+    const handler = createOverrideLineItemHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(
+      createRequest({
+        params: overrideParams(),
+        body: { amount_cents: -1, reason: "" },
+        actor: "ops@example.com",
+      }),
+      response,
+    );
+
+    expect(output.status).toBe(400);
+    expect(output.body).toMatchObject({ error: "invalid_line_item_override_request" });
+  });
+});
+
 describe("POST /ops/customers/:id/credits handler", () => {
   it("requires an ops actor", async () => {
     const { dependencies } = createDependencies();
@@ -279,6 +403,20 @@ function creditBody() {
     amount_cents: 500,
     reason: "Service issue",
     idempotency_key: "credit_1",
+  };
+}
+
+function overrideParams() {
+  return {
+    invoiceId,
+    lineItemId,
+  };
+}
+
+function overrideBody() {
+  return {
+    amount_cents: 8_000,
+    reason: "Contract correction",
   };
 }
 
