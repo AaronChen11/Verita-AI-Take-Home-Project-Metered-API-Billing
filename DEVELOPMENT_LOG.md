@@ -432,3 +432,31 @@ The dashboard keeps API client logic, token persistence, charts, and invoice dis
 ### Limitations
 
 The frontend has been wired and will be build-verified, but it has not yet been exercised against a live backend and seeded database in the browser.
+
+## 2026-06-03: Ops Console Frontend
+
+### Implemented
+
+* Added Customer/Ops view switching in `frontend/src/App.tsx`.
+* Added ops token and ops actor input flow with local browser storage.
+* Added ops API methods for customer reads, credit issuance, and line-item overrides.
+* Added `OpsConsole` component with customer list, customer detail, usage anomaly signal, invoices, audit trail, credit form, and line-item override form.
+* Added UI feedback for loading, errors, and successful money-moving actions.
+* Added explicit UI copy that paid invoices are rejected for direct line-item overrides.
+
+### Design Notes
+
+Ops reads require only `X-Ops-Token`, while credit and override submissions include both `X-Ops-Token` and `X-Ops-Actor`. This mirrors the backend auth split: read-only ops routes are lightweight, and money-moving actions require a trustworthy actor for auditability.
+
+The override form currently asks for invoice and line-item IDs manually because the ops read endpoint returns invoice summaries, not invoice line items. This avoids expanding backend read contracts during the frontend phase.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The ops console is build-verified but has not yet been exercised against a live backend and seeded database in the browser. A more polished ops UX would add invoice detail expansion before line-item override.

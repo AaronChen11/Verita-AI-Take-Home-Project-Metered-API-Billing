@@ -129,6 +129,23 @@
   padding: 6px;
 }
 
+.view-switcher {
+  background: rgba(48, 39, 31, 0.08);
+  border-radius: 999px;
+  display: flex;
+  padding: 5px;
+}
+
+.topbar .toggle {
+  color: var(--ink);
+  padding: 9px 14px;
+}
+
+.topbar .toggle.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
 .toggle {
   background: transparent;
   border: 0;
@@ -144,10 +161,105 @@
   color: var(--ink);
 }
 
+.ops-token-card {
+  grid-template-columns: 1fr minmax(220px, 320px) minmax(220px, 320px);
+}
+
 .panel {
   background: var(--panel);
   border-radius: 30px;
   padding: 26px;
+}
+
+.ops-shell {
+  padding-bottom: 40px;
+}
+
+.ops-hero {
+  background:
+    radial-gradient(circle at 85% 20%, rgba(240, 177, 64, 0.24), transparent 28%),
+    linear-gradient(135deg, #16231d 0%, #17130f 58%, #30271f 100%);
+}
+
+.ops-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+}
+
+.ops-metrics {
+  display: grid;
+  gap: 14px;
+}
+
+.ops-metrics > div {
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  display: flex;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.ops-metrics strong {
+  font-size: 28px;
+}
+
+.danger-metric {
+  background: #ffe1d2 !important;
+  border-color: #ff9f75 !important;
+}
+
+.ops-actions {
+  display: grid;
+  gap: 22px;
+}
+
+.ops-actions form {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+}
+
+.ops-actions input {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  color: var(--ink);
+  padding: 12px 14px;
+}
+
+.ops-actions button {
+  background: var(--ink);
+  border: 0;
+  border-radius: 14px;
+  color: var(--paper);
+  cursor: pointer;
+  font-weight: 900;
+  padding: 13px 16px;
+}
+
+.audit-list {
+  display: grid;
+  gap: 10px;
+}
+
+.audit-row {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 0.8fr 0.8fr 1fr auto;
+  padding: 14px;
+}
+
+.audit-row em {
+  color: var(--muted);
+  font-style: normal;
 }
 
 .panel-heading {
@@ -258,6 +370,11 @@
   border-color: #ff9f75;
 }
 
+.banner.success {
+  background: #d9f1df;
+  border-color: #79b98f;
+}
+
 .eyebrow {
   color: var(--green);
   font-size: 12px;
@@ -279,7 +396,8 @@
   .topbar,
   .token-card,
   .hero-card,
-  .invoice-grid {
+  .invoice-grid,
+  .ops-grid {
     grid-template-columns: 1fr;
   }
 
@@ -298,7 +416,8 @@
   }
 
   .invoice-row,
-  .line-item {
+  .line-item,
+  .audit-row {
     grid-template-columns: 1fr;
   }
 }
