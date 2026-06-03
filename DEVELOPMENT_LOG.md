@@ -53,3 +53,33 @@ The migration includes override metadata on `invoice_line_items` for operational
 Docker could not be verified in this environment because the Docker daemon was unavailable. The attempted command failed while trying to connect to the local Docker socket, before exercising project configuration.
 
 The migration has not yet been executed against Postgres for the same reason. It should be verified with `docker compose up -d` followed by `npm --workspace backend run migrate:up` once Docker is running locally.
+
+## 2026-06-03: Auth, Security, And DB Infrastructure
+
+### Implemented
+
+* Added a shared Postgres pool module in `backend/src/db/pool.ts`.
+* Added API key generation and HMAC hashing helpers in `backend/src/security/apiKeys.ts`.
+* Added constant-time string comparison helper in `backend/src/security/constantTime.ts`.
+* Added customer authentication middleware in `backend/src/auth/customerAuth.ts`.
+* Added ops authentication middleware and a money-moving actor guard in `backend/src/auth/opsAuth.ts`.
+* Added Express request context typing in `backend/src/types/express.d.ts`.
+* Added focused tests for API key hashing, customer auth, and ops auth.
+
+### Design Notes
+
+The API key implementation uses `HMAC-SHA256(API_KEY_PEPPER, raw_token)` rather than storing plaintext keys. The middleware only attaches tenant context after a hash lookup returns an active key, which keeps downstream customer-facing routes from handling raw credentials.
+
+Ops authentication is intentionally lightweight for the take-home. `X-Ops-Token` gates `/ops` access, and `X-Ops-Actor` is captured as request context so future audit-log writes have a trustworthy actor source. The separate `requireOpsActor` guard exists because read-only ops routes may not need the actor, but money-moving routes must reject requests without it.
+
+Auth, security helpers, and database connection code were split into separate files so upcoming features can reuse them without growing `app.ts` into a catch-all module.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+The middleware is not wired into real routes yet because the ingestion and ops endpoints have not been implemented. Database-backed API key lookup still needs a repository implementation once seed data and route handlers are added.

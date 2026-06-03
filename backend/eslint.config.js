@@ -1,5 +1,10 @@
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import tseslint from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
+
+const tsconfigRootDir = dirname(fileURLToPath(import.meta.url));
 
 export default [
   {
@@ -8,6 +13,7 @@ export default [
       parser: tsParser,
       parserOptions: {
         project: "./tsconfig.json",
+        tsconfigRootDir,
       },
     },
     plugins: {
