@@ -235,3 +235,36 @@ Invoice list pagination uses a composite cursor of `(created_at, id)` to match t
 ### Limitations
 
 The endpoints are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. Invoice issuing, paid status transitions, credit issuance, line-item override, and payment webhooks are still pending.
+
+## 2026-06-03: Payment Webhook
+
+### Implemented
+
+* Added `POST /webhooks/payments` in `backend/src/routes/paymentWebhooks.ts`.
+* Added raw-body HMAC signature helpers in `backend/src/security/webhookSignatures.ts`.
+* Mounted the payment webhook route before global JSON parsing so signature verification uses the exact received bytes.
+* Added payment webhook repository in `backend/src/repositories/paymentWebhooks.ts`.
+* Inserted `webhook_deliveries` with `ON CONFLICT (provider_event_id) DO NOTHING` for replay safety.
+* Marked invoices as `paid` transactionally after recording a new webhook delivery.
+* Rolled back webhook processing if the target invoice cannot be marked paid.
+* Returned no-op success for duplicate provider events.
+* Added route, signature, and repository tests.
+
+### Design Notes
+
+Webhook verification uses the raw `Buffer` from `express.raw()` rather than parsed JSON. The route only parses JSON after the signature has been verified, which avoids mismatches from whitespace or key-order normalization.
+
+Webhook replay protection is based on the provider event ID unique constraint. A duplicate event does not reapply invoice state changes and returns success so payment providers can stop retrying.
+
+The MVP webhook payload is intentionally narrow: `invoice.paid` with a provider event ID and invoice ID. This keeps the local payment flow deterministic without pretending to implement a full external payment provider.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+This is a local payment webhook contract, not a real Stripe integration. The route does not yet write audit logs because payment-provider events are system callbacks rather than ops actor actions.
