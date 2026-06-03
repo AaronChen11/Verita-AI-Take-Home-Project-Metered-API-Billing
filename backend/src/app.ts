@@ -5,6 +5,8 @@ import type { EventsRouteDependencies } from "./routes/events.js";
 import { createEventsRouter } from "./routes/events.js";
 import type { InvoiceRouteDependencies } from "./routes/invoices.js";
 import { createInvoicesRouter } from "./routes/invoices.js";
+import type { OpsRouteDependencies } from "./routes/ops.js";
+import { createOpsRouter } from "./routes/ops.js";
 import type { PaymentWebhookRouteDependencies } from "./routes/paymentWebhooks.js";
 import { createPaymentWebhookRouter } from "./routes/paymentWebhooks.js";
 import type { UsageRouteDependencies } from "./routes/usage.js";
@@ -22,6 +24,10 @@ export type AppDependencies = {
     usage: UsageRouteDependencies;
   };
   paymentWebhooks?: PaymentWebhookRouteDependencies;
+  opsApi?: {
+    auth: RequestHandler;
+    ops: OpsRouteDependencies;
+  };
 };
 
 export function createApp(dependencies: AppDependencies = {}) {
@@ -37,6 +43,10 @@ export function createApp(dependencies: AppDependencies = {}) {
 
   app.use(express.json({ limit: "1mb" }));
   app.get("/health", healthHandler);
+
+  if (dependencies.opsApi) {
+    app.use("/ops", dependencies.opsApi.auth, createOpsRouter(dependencies.opsApi.ops));
+  }
 
   if (dependencies.customerApi) {
     app.use(

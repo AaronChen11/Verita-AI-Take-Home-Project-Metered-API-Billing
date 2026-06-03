@@ -107,4 +107,55 @@ describe("createApp", () => {
 
     expect(calls).toEqual(["auth", "ownership", "insert"]);
   });
+
+  it("runs ops auth before ops routes", async () => {
+    const calls: string[] = [];
+    const app = createApp({
+      opsApi: {
+        auth(_req: Request, _res: Response, next: NextFunction) {
+          calls.push("ops-auth");
+          next();
+        },
+        ops: {
+          opsReads: {
+            async listCustomers() {
+              calls.push("list-customers");
+              return [];
+            },
+            async findCustomerDetail() {
+              return undefined;
+            },
+          },
+        },
+      },
+    });
+    const req = {
+      query: {},
+      params: {},
+      method: "GET",
+      url: "/ops/customers",
+      headers: {},
+    } as unknown as Request;
+    const res = {
+      status() {
+        return res;
+      },
+      json() {
+        return res;
+      },
+      setHeader() {
+        return res;
+      },
+      getHeader() {
+        return undefined;
+      },
+      end() {
+        return res;
+      },
+    } as unknown as Response;
+
+    await app(req, res);
+
+    expect(calls).toEqual(["ops-auth", "list-customers"]);
+  });
 });

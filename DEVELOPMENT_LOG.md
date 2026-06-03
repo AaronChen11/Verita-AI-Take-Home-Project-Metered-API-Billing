@@ -268,3 +268,35 @@ The MVP webhook payload is intentionally narrow: `invoice.paid` with a provider 
 ### Limitations
 
 This is a local payment webhook contract, not a real Stripe integration. The route does not yet write audit logs because payment-provider events are system callbacks rather than ops actor actions.
+
+## 2026-06-03: Ops Read APIs
+
+### Implemented
+
+* Added `GET /ops/customers` in `backend/src/routes/ops.ts`.
+* Added `GET /ops/customers/:id` in `backend/src/routes/ops.ts`.
+* Added ops read repository in `backend/src/repositories/opsReads.ts`.
+* Wired `/ops` routes behind `X-Ops-Token` auth.
+* Added customer list pagination with a composite `(created_at, id)` cursor.
+* Added customer detail response with customer summary, usage summary, recent invoices, and audit trail.
+* Added anomaly signal using `current_hour_units > 10x average_hourly_units_last_30_days`.
+* Added route, repository, and app wiring tests.
+
+### Design Notes
+
+Ops read APIs are protected by the shared ops token but do not require `X-Ops-Actor`, because they do not move money or mutate financial state. Money-moving ops endpoints will use `requireOpsActor` when credits and line-item overrides are implemented.
+
+The anomaly signal is intentionally simple and read-only. It is an ops hint computed from `usage_windows`; it does not modify usage, invoices, credits, billing calculations, or customer-visible state.
+
+The customer list cursor includes both `created_at` and `id` to match the descending sort order. This avoids unstable pagination when customers share a creation timestamp.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The endpoints are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. The audit trail currently filters by `entity_id = customer_id`; future ops detail views may also include invoice-level audit entries for the customer's invoices.
