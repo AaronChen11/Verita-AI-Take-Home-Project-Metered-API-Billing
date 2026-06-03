@@ -400,3 +400,35 @@ Seeded invoices include `draft`, `issued`, and `paid` states so customer invoice
 ### Limitations
 
 The scripts are typechecked but have not been executed against live Postgres yet. Running `migrate:up`, `seed`, and `generate:usage` requires the local database to be started first.
+
+## 2026-06-03: Customer Dashboard Frontend
+
+### Implemented
+
+* Replaced the default Vite page with a customer billing dashboard.
+* Added a demo API key input flow with local browser storage.
+* Added frontend API client in `frontend/src/lib/api.ts`.
+* Added `UsageChart`, `InvoicePanel`, and `CustomerDashboard` components.
+* Added hourly/daily usage display controls.
+* Added invoice list and invoice detail views with line items and credits.
+* Added loading, error, and empty states.
+* Added a Vite dev proxy from `/api` to the backend at `localhost:4000`.
+
+### Design Notes
+
+The frontend uses the same customer API contract as the backend: `GET /v1/usage`, `GET /v1/invoices`, and `GET /v1/invoices/:id`. The API key is sent as a bearer token and stored only in local browser storage for the local demo.
+
+The customer UI is intentionally read-only. Billing mutations remain in the ops flows because credits and overrides require `X-Ops-Actor` and audit logging.
+
+The dashboard keeps API client logic, token persistence, charts, and invoice display in separate files so the UI can grow without making `App.tsx` a mixed responsibility file.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The frontend has been wired and will be build-verified, but it has not yet been exercised against a live backend and seeded database in the browser.
