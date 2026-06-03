@@ -369,3 +369,34 @@ Invoice totals are recalculated from all line items after the override, then cre
 ### Limitations
 
 The route and repository are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. The MVP does not keep historical versions of line items beyond audit log before/after snapshots.
+
+## 2026-06-03: Seed And Demo Data
+
+### Implemented
+
+* Added deterministic demo IDs in `backend/src/scripts/demoIds.ts`.
+* Added `npm run seed` backed by `backend/src/scripts/seed.ts`.
+* Added `npm run generate:usage` backed by `backend/src/scripts/generateUsage.ts`.
+* Seeded a demo price plan, price tiers, customer, hashed API key, usage events, invoices in different statuses, a credit, and an audit log.
+* Generated the raw demo API key only on first API key insert and persisted only the HMAC hash.
+* Made usage generation deterministic with stable `request_id` values so reruns do not duplicate usage.
+* Updated README with seed and usage generator commands.
+
+### Design Notes
+
+The seed script respects the API key storage model: it prints the raw demo token only when inserting the key for the first time, then stores only `HMAC-SHA256(API_KEY_PEPPER, token)`. Reruns cannot recover the token, which matches production behavior.
+
+The usage generator writes directly to `usage_events` with deterministic request IDs. This lets local demos repeatedly create or top up sample data without breaking ingestion idempotency semantics.
+
+Seeded invoices include `draft`, `issued`, and `paid` states so customer invoice reads, ops credits, line-item override rules, and paid-invoice rejection can be exercised locally.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The scripts are typechecked but have not been executed against live Postgres yet. Running `migrate:up`, `seed`, and `generate:usage` requires the local database to be started first.

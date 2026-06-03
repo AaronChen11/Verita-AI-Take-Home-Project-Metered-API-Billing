@@ -8,6 +8,8 @@
   "scripts": {
     "dev:backend": "npm --workspace backend run dev",
     "dev:frontend": "npm --workspace frontend run dev",
+    "seed": "npm --workspace backend run seed",
+    "generate:usage": "npm --workspace backend run generate:usage",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
