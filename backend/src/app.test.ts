@@ -22,12 +22,12 @@ describe("createApp", () => {
   it("runs customer auth before event routes", async () => {
     const calls: string[] = [];
     const app = createApp({
-      events: {
+      customerApi: {
         auth(_req: Request, _res: Response, next: NextFunction) {
           calls.push("auth");
           next();
         },
-        routes: {
+        events: {
           apiKeys: {
             async findActiveIdsForCustomer() {
               calls.push("ownership");
@@ -38,6 +38,18 @@ describe("createApp", () => {
             async insertMany() {
               calls.push("insert");
               return 1;
+            },
+          },
+        },
+        usage: {
+          apiKeys: {
+            async findActiveIdsForCustomer() {
+              return new Set();
+            },
+          },
+          usageRead: {
+            async listBuckets() {
+              return [];
             },
           },
         },

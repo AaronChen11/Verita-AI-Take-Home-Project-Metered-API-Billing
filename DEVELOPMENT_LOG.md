@@ -142,3 +142,36 @@ The MVP job lock uses Postgres advisory locks. If another aggregation run alread
 ### Limitations
 
 This implements the aggregation job service and repository but does not yet add a CLI command or scheduler entrypoint. It also does not write `job_runs` rows yet; that should be added when command execution is wired so job attempts, skips, and failures are observable.
+
+## 2026-06-03: Customer Usage Read API
+
+### Implemented
+
+* Added `GET /v1/usage` route construction in `backend/src/routes/usage.ts`.
+* Supported `start`, `end`, `api_key_id`, `granularity`, `limit`, and `cursor` query params.
+* Defaulted usage reads to hourly buckets.
+* Added daily aggregation support with `granularity=day`.
+* Added cursor pagination based on the last returned bucket start.
+* Added usage read repository in `backend/src/repositories/usageRead.ts`.
+* Read from `usage_windows` when no `api_key_id` filter is present.
+* Read from raw `usage_events` when `api_key_id` filtering is requested.
+* Validated that filtered `api_key_id` values belong to the authenticated customer.
+* Added route and repository tests for hourly usage, daily usage, API key filtering, pagination, and invalid inputs.
+
+### Design Notes
+
+The default usage read path uses `usage_windows`, which matches the MVP aggregation grain of one row per `customer x hour`. This keeps dashboard reads aligned with the derived billing usage state.
+
+The `api_key_id` filter intentionally reads from raw `usage_events` in the MVP because `usage_windows` does not include API key dimension. This preserves the required filter behavior without adding another rollup table before it is needed. At higher scale, this should become a `usage_windows_by_api_key` rollup.
+
+Cursor pagination uses an encoded bucket start timestamp. The repository fetches `limit + 1` rows so the route can return a `next_cursor` without needing a separate count query.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+The route has unit coverage with fake repositories and SQL-shape repository tests, but it has not yet been exercised against live Postgres because Docker is unavailable in this environment.
