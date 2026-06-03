@@ -114,3 +114,31 @@ The route and repositories are separate files because ingestion will become a co
 ### Limitations
 
 The route is wired to application construction, but full end-to-end HTTP verification against a real Postgres database still depends on running Docker locally. The current tests use fake repositories to validate route behavior without requiring database connectivity.
+
+## 2026-06-03: Hourly Usage Aggregation Job
+
+### Implemented
+
+* Added a Postgres advisory-lock runner in `backend/src/db/advisoryLock.ts`.
+* Added usage window recomputation repository in `backend/src/repositories/usageWindows.ts`.
+* Added aggregation job orchestration in `backend/src/jobs/aggregateUsage.ts`.
+* Added a default 48-hour lookback window for late-arriving usage events.
+* Added tests for aggregation range calculation, advisory-lock skip behavior, and recompute-upsert SQL shape.
+
+### Design Notes
+
+The aggregation job recomputes hourly windows directly from immutable `usage_events` for a target time range. It does not increment existing totals, because an incremental `+=` approach can double-count if the job reruns after a retry or concurrent invocation.
+
+The upsert target is `usage_windows(customer_id, window_start)`, matching the schema-level uniqueness constraint. Rerunning the same range replaces `total_units` with the recomputed value, which also supports late events that arrive inside the lookback window.
+
+The MVP job lock uses Postgres advisory locks. If another aggregation run already holds the lock, the duplicate run exits with a `skipped` result instead of competing for the same derived rows.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+This implements the aggregation job service and repository but does not yet add a CLI command or scheduler entrypoint. It also does not write `job_runs` rows yet; that should be added when command execution is wired so job attempts, skips, and failures are observable.
