@@ -175,3 +175,33 @@ Cursor pagination uses an encoded bucket start timestamp. The repository fetches
 ### Limitations
 
 The route has unit coverage with fake repositories and SQL-shape repository tests, but it has not yet been exercised against live Postgres because Docker is unavailable in this environment.
+
+## 2026-06-03: Monthly Invoice Generation
+
+### Implemented
+
+* Added tiered pricing calculation in `backend/src/billing/pricing.ts`.
+* Added deterministic `half-up` rounding from micro-dollars to cents.
+* Added invoice generation repository in `backend/src/repositories/invoices.ts`.
+* Added invoice generation job orchestration in `backend/src/jobs/generateInvoices.ts`.
+* Used a Postgres advisory lock key for invoice generation job exclusion.
+* Used `ON CONFLICT (customer_id, period_start, period_end) DO NOTHING` to make invoice creation idempotent.
+* Added tests for tier math, rounding, invoice job locking, existing-invoice reruns, and invoice repository transaction shape.
+
+### Design Notes
+
+Pricing uses integer micro-dollar unit prices and stores final invoice amounts in integer cents. The conversion uses a single `half-up` rounding helper so invoice generation and future invoice recalculation paths can share the same policy.
+
+The invoice job reads each customer's usage from hourly `usage_windows` for the billing period, applies that customer's plan tiers, and creates a draft invoice with line items in one transaction. Existing invoices are treated as skipped rather than overwritten, preserving the rule that generated financial records should not be silently mutated.
+
+The database unique constraint on `(customer_id, period_start, period_end)` is the final idempotency guard. The job-level advisory lock reduces duplicate work, but correctness does not depend only on the lock.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+
+### Limitations
+
+The job service is implemented but does not yet have a CLI or scheduler entrypoint. It also creates draft invoices only; issuing invoices, customer invoice read APIs, credits, overrides, and payment webhooks still need to be implemented.
