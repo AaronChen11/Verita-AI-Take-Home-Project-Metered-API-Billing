@@ -10,7 +10,7 @@ Correctness-first metered API billing MVP.
 ## Local Setup
 
 1. Copy `.env.example` to `.env`.
-2. Start Postgres with `docker compose up -d`.
+2. Start Postgres with `docker compose up -d`. The local Docker database listens on `localhost:5433` to avoid conflicting with an existing Postgres on the default `5432` port.
 3. Install workspace dependencies with `npm install`.
 4. Run database migrations with `npm --workspace backend run migrate:up`.
 5. Seed local demo data with `npm run seed`.

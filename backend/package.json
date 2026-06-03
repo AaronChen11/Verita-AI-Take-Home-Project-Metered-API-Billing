@@ -4,16 +4,16 @@
   "version": "0.0.1",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "DOTENV_CONFIG_PATH=../.env tsx watch src/index.ts",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "seed": "tsx src/scripts/seed.ts",
-    "generate:usage": "tsx src/scripts/generateUsage.ts",
-    "migrate:up": "node-pg-migrate -m src/db/migrations up",
-    "migrate:down": "node-pg-migrate -m src/db/migrations down",
-    "migrate:create": "node-pg-migrate -m src/db/migrations create"
+    "seed": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/seed.ts",
+    "generate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/generateUsage.ts",
+    "migrate:up": "node-pg-migrate --envPath ../.env -m src/db/migrations up",
+    "migrate:down": "node-pg-migrate --envPath ../.env -m src/db/migrations down",
+    "migrate:create": "node-pg-migrate --envPath ../.env -m src/db/migrations create"
   },
   "dependencies": {
     "dotenv": "^17.2.3",
