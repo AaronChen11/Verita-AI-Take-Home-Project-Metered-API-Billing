@@ -144,16 +144,28 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
       this.pool.query<OpsAuditLogRow>(
         `
           SELECT
-            id,
-            actor,
-            action,
-            entity_type,
-            entity_id,
-            reason,
-            created_at
+            audit_logs.id,
+            audit_logs.actor,
+            audit_logs.action,
+            audit_logs.entity_type,
+            audit_logs.entity_id,
+            audit_logs.reason,
+            audit_logs.created_at
           FROM audit_logs
-          WHERE entity_id = $1
-          ORDER BY created_at DESC, id DESC
+          WHERE audit_logs.entity_id = $1
+             OR audit_logs.entity_id IN (
+               SELECT invoices.id
+               FROM invoices
+               WHERE invoices.customer_id = $1
+             )
+             OR audit_logs.entity_id IN (
+               SELECT invoice_line_items.id
+               FROM invoice_line_items
+               JOIN invoices
+                 ON invoices.id = invoice_line_items.invoice_id
+               WHERE invoices.customer_id = $1
+             )
+          ORDER BY audit_logs.created_at DESC, audit_logs.id DESC
           LIMIT 20
         `,
         [customerId],

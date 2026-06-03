@@ -11,6 +11,7 @@
     "test": "vitest run",
     "seed": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/seed.ts",
     "generate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/generateUsage.ts",
+    "aggregate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/aggregateUsage.ts",
     "migrate:up": "node-pg-migrate --envPath ../.env -m src/db/migrations up",
     "migrate:down": "node-pg-migrate --envPath ../.env -m src/db/migrations down",
     "migrate:create": "node-pg-migrate --envPath ../.env -m src/db/migrations create"

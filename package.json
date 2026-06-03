@@ -10,6 +10,7 @@
     "dev:frontend": "npm --workspace frontend run dev",
     "seed": "npm --workspace backend run seed",
     "generate:usage": "npm --workspace backend run generate:usage",
+    "aggregate:usage": "npm --workspace backend run aggregate:usage",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",

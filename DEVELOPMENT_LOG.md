@@ -460,3 +460,90 @@ The override form currently asks for invoice and line-item IDs manually because 
 ### Limitations
 
 The ops console is build-verified but has not yet been exercised against a live backend and seeded database in the browser. A more polished ops UX would add invoice detail expansion before line-item override.
+
+## 2026-06-03: Local Database Setup Fix
+
+### Implemented
+
+* Updated Docker Postgres host port from `5432` to `5433` while keeping the container port at `5432`.
+* Updated `.env.example` and local env files to use `localhost:5433`.
+* Kept backend scripts pointed at the root `.env` through explicit dotenv configuration.
+* Documented the non-default local database port in README setup instructions.
+
+### Design Notes
+
+The take-home should not require the reviewer to stop an existing local Postgres service. Mapping the project database to `5433` keeps the Docker database isolated while preserving standard Postgres defaults inside the container.
+
+The backend workspace scripts load `../.env` so commands run from the monorepo root through npm workspaces consistently receive the required database URL and local secrets.
+
+### Verification
+
+* `docker compose up -d` started the local Postgres container on `localhost:5433`.
+* `npm --workspace backend run migrate:up` applied the initial schema migration successfully.
+* `npm run seed` inserted the deterministic demo customer, API key, invoices, credits, audit log, and 216 usage events successfully.
+
+## 2026-06-03: Live Demo Aggregation Command
+
+### Implemented
+
+* Added `backend/src/scripts/aggregateUsage.ts` as a dedicated CLI wrapper around the existing hourly aggregation job.
+* Added root and backend `aggregate:usage` npm scripts.
+* Updated README setup so local demo data is seeded and then recomputed into `usage_windows` before opening the dashboard.
+
+### Design Notes
+
+The customer usage endpoint reads hourly buckets from `usage_windows`, so seeded `usage_events` must be aggregated before the dashboard can show non-empty usage. Keeping aggregation as an explicit command makes the demo flow honest: ingestion, rollup, and reads remain separate stages.
+
+The script uses the same Postgres advisory lock path as the production job function, so local execution exercises the real concurrency guard instead of bypassing it.
+
+### Verification
+
+* `npm run aggregate:usage` succeeded against local Docker Postgres.
+* The command recomputed the `2026-06-02T00:00:00.000Z` through `2026-06-04T00:00:00.000Z` range and upserted 48 hourly windows.
+* `GET /v1/usage` returned hourly buckets with 750 units per hour and daily buckets with 18000 units per day for the seeded data.
+
+## 2026-06-03: Ops Audit Read Fix
+
+### Implemented
+
+* Updated ops customer detail reads to include audit logs attached to the customer's invoices.
+* Updated ops customer detail reads to include audit logs attached to invoice line items under the customer's invoices.
+* Added repository test coverage for customer-related invoice and line-item audit lookup.
+
+### Design Notes
+
+Credit creation writes audit rows against the invoice, and line-item override writes audit rows against the invoice line item. The ops customer detail page needs the full customer financial trail, so the read model must collect audits through those relationships instead of only matching the customer id directly.
+
+### Verification
+
+* Live ops customer detail returned invoice and invoice-line-item audit rows after credit and override actions.
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-03: Live API Verification
+
+### Implemented
+
+* Started the backend dev server on `localhost:4000`.
+* Started the frontend Vite dev server on `localhost:5176`.
+* Verified customer invoice reads against the seeded database.
+* Verified ops customer detail reads against the seeded database.
+* Verified ops credit issuance updates invoice totals and creates audit history.
+* Verified issued-invoice line-item override updates invoice totals and creates audit history.
+* Verified paid-invoice line-item override is rejected with `paid_invoice_cannot_be_overridden`.
+
+### Design Notes
+
+The live verification exercised the same local env, Docker Postgres, Express routes, and seeded records that a reviewer will use. This caught the missing aggregation CLI and the customer-detail audit read gap before final documentation.
+
+The in-app browser automation surface was unavailable in this session, so UI interaction was not browser-click verified. The frontend dev server did serve the Vite app shell successfully, and the backend contracts used by the UI were verified directly.
+
+### Verification
+
+* `GET /v1/invoices` returned seeded invoice summaries.
+* `GET /v1/invoices/:id` returned line items and invoice-bound credits.
+* `GET /ops/customers/:id` returned usage summary, invoice summaries, and related audit logs.
+* `POST /ops/customers/:id/credits` returned updated invoice totals.
+* `PATCH /ops/invoices/:invoiceId/line-items/:lineItemId` succeeded for an issued invoice and returned 409 for a paid invoice.

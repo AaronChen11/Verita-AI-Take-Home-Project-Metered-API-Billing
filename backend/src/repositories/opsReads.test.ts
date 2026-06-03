@@ -64,5 +64,8 @@ describe("PostgresOpsReadRepository", () => {
     });
     expect(queries[1]?.text).toContain("now() - interval '30 days'");
     expect(queries[1]?.values).toEqual(["00000000-0000-4000-8000-000000000001"]);
+    expect(queries[3]?.text).toContain("FROM invoices");
+    expect(queries[3]?.text).toContain("FROM invoice_line_items");
+    expect(queries[3]?.values).toEqual(["00000000-0000-4000-8000-000000000001"]);
   });
 });
