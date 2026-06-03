@@ -117,6 +117,11 @@ describe("createApp", () => {
           next();
         },
         ops: {
+          credits: {
+            async issueCredit() {
+              throw new Error("not used");
+            },
+          },
           opsReads: {
             async listCustomers() {
               calls.push("list-customers");

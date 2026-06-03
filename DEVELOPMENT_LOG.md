@@ -300,3 +300,37 @@ The customer list cursor includes both `created_at` and `id` to match the descen
 ### Limitations
 
 The endpoints are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. The audit trail currently filters by `entity_id = customer_id`; future ops detail views may also include invoice-level audit entries for the customer's invoices.
+
+## 2026-06-03: Ops Credit Issuance
+
+### Implemented
+
+* Added `POST /ops/customers/:id/credits` in `backend/src/routes/ops.ts`.
+* Required `X-Ops-Actor` for credit issuance.
+* Required `invoice_id`, `amount_cents`, `reason`, and `idempotency_key`.
+* Added invoice-bound credit repository in `backend/src/repositories/credits.ts`.
+* Inserted credits transactionally with `ON CONFLICT (customer_id, idempotency_key) DO NOTHING`.
+* Locked the target invoice before applying credit changes.
+* Recalculated invoice `credits_cents` and `total_cents` transactionally.
+* Wrote an `audit_logs` entry with before and after invoice totals.
+* Returned no-op success for duplicate idempotency keys.
+* Added route and repository tests for actor enforcement, validation, idempotency, invoice total recalculation, rollback, and audit logging.
+
+### Design Notes
+
+Credits are invoice-bound in the MVP. The route requires `invoice_id`, and the repository verifies the invoice belongs to the target customer before inserting the credit.
+
+Credit issuance is a money-moving ops action, so it requires `X-Ops-Actor`. The actor is persisted as both `credits.created_by` and `audit_logs.actor`, which gives the MVP a trustworthy actor source without implementing full SSO/RBAC.
+
+Duplicate credit requests use `(customer_id, idempotency_key)` as the idempotency boundary. A duplicate request returns the existing credit and its invoice totals without writing another credit or audit log.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+### Limitations
+
+The route and repository are covered with unit and SQL-shape tests but have not been exercised against live Postgres yet. Credits cannot exceed invoice subtotal at the invoice total level because totals are clamped to zero, but the MVP does not yet enforce a business rejection for over-crediting.

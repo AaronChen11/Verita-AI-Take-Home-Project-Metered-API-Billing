@@ -2,6 +2,8 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { z } from "zod";
 
+import type { CreditRepository } from "../repositories/credits.js";
+import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
 import type {
   OpsAuditLogEntry,
   OpsCustomerDetail,
@@ -24,8 +26,16 @@ const customerIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
+const issueCreditBodySchema = z.object({
+  invoice_id: z.string().uuid(),
+  amount_cents: z.number().int().positive(),
+  reason: z.string().trim().min(1),
+  idempotency_key: z.string().trim().min(1),
+});
+
 export type OpsRouteDependencies = {
   opsReads: OpsReadRepository;
+  credits: CreditRepository;
 };
 
 export function createListOpsCustomersHandler(dependencies: OpsRouteDependencies) {
@@ -71,11 +81,59 @@ export function createGetOpsCustomerHandler(dependencies: OpsRouteDependencies) 
   };
 }
 
+export function createIssueCreditHandler(dependencies: OpsRouteDependencies) {
+  return async function issueCredit(req: Request, res: Response) {
+    if (!req.ops?.actor) {
+      res.status(400).json({ error: "missing_ops_actor" });
+      return;
+    }
+
+    const params = customerIdParamsSchema.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: "invalid_customer_id" });
+      return;
+    }
+
+    const parsedBody = issueCreditBodySchema.safeParse(req.body);
+    if (!parsedBody.success) {
+      res.status(400).json({ error: "invalid_credit_request", details: parsedBody.error.flatten() });
+      return;
+    }
+
+    try {
+      const result = await dependencies.credits.issueCredit({
+        customerId: params.data.id,
+        invoiceId: parsedBody.data.invoice_id,
+        amountCents: parsedBody.data.amount_cents,
+        reason: parsedBody.data.reason,
+        idempotencyKey: parsedBody.data.idempotency_key,
+        actor: req.ops.actor,
+      });
+
+      res.status(result.duplicate ? 200 : 201).json({
+        data: {
+          credit_id: result.creditId,
+          duplicate: result.duplicate,
+          invoice: serializeInvoiceTotals(result.invoice),
+        },
+      });
+    } catch (error) {
+      if (error instanceof CreditInvoiceNotFoundError) {
+        res.status(404).json({ error: "invoice_not_found" });
+        return;
+      }
+
+      throw error;
+    }
+  };
+}
+
 export function createOpsRouter(dependencies: OpsRouteDependencies) {
   const router = Router();
 
   router.get("/customers", createListOpsCustomersHandler(dependencies));
   router.get("/customers/:id", createGetOpsCustomerHandler(dependencies));
+  router.post("/customers/:id/credits", createIssueCreditHandler(dependencies));
 
   return router;
 }
@@ -150,6 +208,15 @@ function serializeInvoiceSummary(invoice: OpsInvoiceSummary) {
     status: invoice.status,
     total_cents: invoice.totalCents,
     created_at: invoice.createdAt.toISOString(),
+  };
+}
+
+function serializeInvoiceTotals(invoice: { id: string; subtotalCents: number; creditsCents: number; totalCents: number }) {
+  return {
+    id: invoice.id,
+    subtotal_cents: invoice.subtotalCents,
+    credits_cents: invoice.creditsCents,
+    total_cents: invoice.totalCents,
   };
 }
 

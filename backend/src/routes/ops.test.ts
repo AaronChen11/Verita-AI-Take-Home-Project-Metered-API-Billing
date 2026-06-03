@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { Request, Response } from "express";
 
-import { createGetOpsCustomerHandler, createListOpsCustomersHandler, encodeOpsCustomerCursor } from "./ops.js";
+import {
+  createGetOpsCustomerHandler,
+  createIssueCreditHandler,
+  createListOpsCustomersHandler,
+  encodeOpsCustomerCursor,
+} from "./ops.js";
 import type { OpsRouteDependencies } from "./ops.js";
+import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
 import type { OpsCustomerDetail, OpsCustomerSummary, OpsCustomerListCursor } from "../repositories/opsReads.js";
 
 const customerId = "00000000-0000-4000-8000-000000000001";
+const invoiceId = "00000000-0000-4000-8000-000000000010";
 
 function createResponse() {
   const output: { status?: number; body?: unknown } = {};
@@ -23,16 +30,54 @@ function createResponse() {
   return { output, response };
 }
 
-function createRequest(options: { query?: Record<string, unknown>; params?: Record<string, string> }) {
+function createRequest(options: {
+  query?: Record<string, unknown>;
+  params?: Record<string, string>;
+  body?: unknown;
+  actor?: string;
+}) {
   return {
     query: options.query ?? {},
     params: options.params ?? {},
+    body: options.body,
+    ops: options.actor === undefined ? undefined : { actor: options.actor },
   } as Request;
 }
 
-function createDependencies(options?: { customers?: OpsCustomerSummary[]; detail?: OpsCustomerDetail; detailFound?: boolean }) {
-  const calls: Array<{ method: string; limit?: number; cursor?: OpsCustomerListCursor; customerId?: string }> = [];
+function createDependencies(options?: {
+  customers?: OpsCustomerSummary[];
+  detail?: OpsCustomerDetail;
+  detailFound?: boolean;
+  duplicateCredit?: boolean;
+  invoiceNotFound?: boolean;
+}) {
+  const calls: Array<{
+    method: string;
+    limit?: number;
+    cursor?: OpsCustomerListCursor;
+    customerId?: string;
+    credit?: unknown;
+  }> = [];
   const dependencies: OpsRouteDependencies = {
+    credits: {
+      async issueCredit(input) {
+        calls.push({ method: "credit", credit: input });
+        if (options?.invoiceNotFound) {
+          throw new CreditInvoiceNotFoundError(input.invoiceId);
+        }
+
+        return {
+          creditId: "00000000-0000-4000-8000-000000000030",
+          duplicate: options?.duplicateCredit ?? false,
+          invoice: {
+            id: input.invoiceId,
+            subtotalCents: 10_000,
+            creditsCents: 500,
+            totalCents: 9_500,
+          },
+        };
+      },
+    },
     opsReads: {
       async listCustomers(limit, cursor) {
         calls.push({ method: "list", limit, cursor });
@@ -142,6 +187,100 @@ describe("GET /ops/customers handler", () => {
     expect(calls[0]?.cursor).toEqual({ createdAt: cursorCustomer.createdAt, id: cursorCustomer.id });
   });
 });
+
+describe("POST /ops/customers/:id/credits handler", () => {
+  it("requires an ops actor", async () => {
+    const { dependencies } = createDependencies();
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: { id: customerId }, body: creditBody() }), response);
+
+    expect(output).toEqual({ status: 400, body: { error: "missing_ops_actor" } });
+  });
+
+  it("issues an invoice-bound credit", async () => {
+    const { calls, dependencies } = createDependencies();
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: { id: customerId }, body: creditBody(), actor: "ops@example.com" }), response);
+
+    expect(calls[0]).toMatchObject({
+      method: "credit",
+      credit: {
+        customerId,
+        invoiceId,
+        amountCents: 500,
+        reason: "Service issue",
+        idempotencyKey: "credit_1",
+        actor: "ops@example.com",
+      },
+    });
+    expect(output).toEqual({
+      status: 201,
+      body: {
+        data: {
+          credit_id: "00000000-0000-4000-8000-000000000030",
+          duplicate: false,
+          invoice: {
+            id: invoiceId,
+            subtotal_cents: 10_000,
+            credits_cents: 500,
+            total_cents: 9_500,
+          },
+        },
+      },
+    });
+  });
+
+  it("returns no-op success for duplicate idempotency keys", async () => {
+    const { dependencies } = createDependencies({ duplicateCredit: true });
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: { id: customerId }, body: creditBody(), actor: "ops@example.com" }), response);
+
+    expect(output).toMatchObject({ status: 200, body: { data: { duplicate: true } } });
+  });
+
+  it("returns 404 when the invoice is not scoped to the customer", async () => {
+    const { dependencies } = createDependencies({ invoiceNotFound: true });
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: { id: customerId }, body: creditBody(), actor: "ops@example.com" }), response);
+
+    expect(output).toEqual({ status: 404, body: { error: "invoice_not_found" } });
+  });
+
+  it("rejects invalid credit requests", async () => {
+    const { dependencies } = createDependencies();
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(
+      createRequest({
+        params: { id: customerId },
+        body: { ...creditBody(), reason: "", amount_cents: 0 },
+        actor: "ops@example.com",
+      }),
+      response,
+    );
+
+    expect(output.status).toBe(400);
+    expect(output.body).toMatchObject({ error: "invalid_credit_request" });
+  });
+});
+
+function creditBody() {
+  return {
+    invoice_id: invoiceId,
+    amount_cents: 500,
+    reason: "Service issue",
+    idempotency_key: "credit_1",
+  };
+}
 
 describe("GET /ops/customers/:id handler", () => {
   it("returns customer detail with usage, invoices, and audit trail", async () => {
