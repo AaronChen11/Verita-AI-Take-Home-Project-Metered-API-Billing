@@ -95,6 +95,14 @@ export async function fetchUsage(token: string, granularity: UsageGranularity) {
   )
 }
 
+export async function validateCustomerToken(token: string): Promise<void> {
+  await apiGet<unknown>('/v1/invoices?limit=1', token)
+}
+
+export async function validateOpsCredentials(opsToken: string): Promise<void> {
+  await opsGet<unknown>('/ops/customers?limit=1', opsToken)
+}
+
 export async function fetchInvoices(token: string) {
   return apiGet<{ data: InvoiceSummary[]; next_cursor: string | null }>('/v1/invoices?limit=12', token)
 }

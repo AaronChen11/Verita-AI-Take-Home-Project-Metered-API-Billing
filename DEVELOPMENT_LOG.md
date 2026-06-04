@@ -647,7 +647,6 @@ The integration suite is intentionally separate from default unit tests because 
 * Updated dashboard and ops hero headings to use roman plus italic display typography.
 * Added invoice status badge color states, highlighted applied credits, styled override markers, and normalized audit detail toggles.
 * Raised the frontend build chunk warning limit to fit the Recharts-powered demo bundle without masking genuinely large bundles.
-
 ### Design Notes
 
 The restyle keeps the existing product flow and component structure intact while aligning the visual language with the Verita references: serif-led typography, small uppercase labels, quiet surfaces, burgundy calls to action, and minimal ornament.
@@ -658,7 +657,6 @@ The restyle keeps the existing product flow and component structure intact while
 * `npm run lint` passed.
 * `npm run typecheck` passed.
 * `npm run build` passed.
-* Browser automation was unavailable in this session, so final visual QA should be done manually in the local browser.
 
 ## 2026-06-04: Recharts Line Chart And Usage Preview
 
@@ -732,3 +730,25 @@ The topbar nav pattern follows the Verita site structure: no background card, si
 
 * `npm run typecheck` passed.
 * `npm run build` passed.
+
+## 2026-06-04: Authentication Entry Redesign
+
+### Implemented
+
+* Added a dedicated routed authentication entry page for customer API key login and ops token plus actor authorization.
+* Added route guards so unauthenticated customer and ops dashboard routes redirect to `/login`.
+* Added a disconnect action that clears stored customer and ops credentials and returns the user to the login page.
+* Added lightweight credential validation calls before entering the dashboard views.
+* Redesigned the authentication and authorization entry page to match Verita's login pattern with a light split layout, thin navigation rules, serif welcome copy, and burgundy sign-in controls.
+
+### Design Notes
+
+The login page is still intentionally lightweight for the take-home: it validates existing demo credentials rather than adding full account login. The UI now separates customer authentication from ops authorization while keeping both flows visible in one entry point.
+
+### Verification
+
+* `git diff --check` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* Browser automation was unavailable in this session, so final visual QA should be done manually in the local browser.
