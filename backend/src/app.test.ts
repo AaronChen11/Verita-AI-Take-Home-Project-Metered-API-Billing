@@ -22,6 +22,7 @@ describe("createApp", () => {
   it("runs customer auth before event routes", async () => {
     const calls: string[] = [];
     const app = createApp({
+      rateLimitEvents: false,
       customerApi: {
         auth(_req: Request, _res: Response, next: NextFunction) {
           calls.push("auth");
@@ -83,7 +84,10 @@ describe("createApp", () => {
       },
       method: "POST",
       url: "/v1/events",
-      headers: {},
+      headers: {
+        authorization: "Bearer test-token",
+      },
+      ip: "127.0.0.1",
     } as unknown as Request;
     const res = {
       status() {

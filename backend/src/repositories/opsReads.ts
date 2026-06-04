@@ -66,7 +66,6 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
   async listCustomers(limit: number, cursor?: OpsCustomerListCursor) {
     const cursorFilter = cursor ? "AND (customers.created_at, customers.id) < ($2, $3)" : "";
     const values = cursor ? [limit, cursor.createdAt, cursor.id] : [limit];
-    const limitParam = cursor ? "$1" : "$1";
     const result = await this.pool.query<OpsCustomerRow>(
       `
         SELECT
@@ -81,7 +80,7 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
         WHERE true
           ${cursorFilter}
         ORDER BY customers.created_at DESC, customers.id DESC
-        LIMIT ${limitParam}
+        LIMIT $1
       `,
       values,
     );

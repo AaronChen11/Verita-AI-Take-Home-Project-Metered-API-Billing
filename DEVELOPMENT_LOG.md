@@ -753,6 +753,29 @@ The login page is still intentionally lightweight for the take-home: it validate
 * `npm run build` passed.
 * Browser automation was unavailable in this session, so final visual QA should be done manually in the local browser.
 
+## 2026-06-04: Backend Robustness Improvements
+
+### Implemented
+
+* Added an ingestion rate limiter for `POST /v1/events` keyed by the bearer token, with a one-minute window and a `rate_limit_exceeded` error response.
+* Added a 90-day maximum range guard for `GET /v1/usage` so cloud reads remain bounded.
+* Tightened credit idempotency handling so a failed duplicate lookup throws instead of returning an empty credit ID.
+* Simplified ops customer pagination SQL by using a single explicit `LIMIT $1`.
+* Changed the usage aggregation script output to structured JSON logs for cloud job readability.
+* Added an app dependency switch so route-order unit tests can disable the event limiter while production keeps it enabled by default.
+
+### Design Notes
+
+The rate limiter protects the write-heavy ingestion endpoint without affecting read routes. Tests still bypass the limiter under test mode, but the app-level route-order test uses a realistic request shape so the middleware chain remains representative.
+
+### Verification
+
+* `git diff --check` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* `npm run test` passed.
+
 ## 2026-06-04: Cloud Deployment Foundation
 
 ### Implemented

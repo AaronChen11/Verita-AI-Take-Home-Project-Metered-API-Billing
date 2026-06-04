@@ -43,6 +43,12 @@ export function createGetUsageHandler(dependencies: UsageRouteDependencies) {
       return;
     }
 
+    const MAX_RANGE_MS = 90 * 24 * 60 * 60 * 1000;
+    if (end.getTime() - start.getTime() > MAX_RANGE_MS) {
+      res.status(400).json({ error: "date_range_too_large", detail: "Maximum range is 90 days" });
+      return;
+    }
+
     const cursorStart = decodeCursor(parsed.data.cursor);
     if (parsed.data.cursor && !cursorStart) {
       res.status(400).json({ error: "invalid_cursor" });

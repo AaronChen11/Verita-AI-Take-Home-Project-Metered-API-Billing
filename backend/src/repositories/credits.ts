@@ -152,7 +152,11 @@ async function insertCredit(client: PoolClient, input: IssueCreditInput): Promis
   );
   const existingCredit = existing.rows[0];
 
-  return { id: existingCredit?.id ?? "", invoiceId: existingCredit?.invoice_id ?? input.invoiceId, created: false };
+  if (!existingCredit) {
+    throw new Error(`Idempotent credit lookup failed: no row found for key ${input.idempotencyKey}`);
+  }
+
+  return { id: existingCredit.id, invoiceId: existingCredit.invoice_id, created: false };
 }
 
 async function getInvoiceTotals(client: PoolClient, invoiceId: string) {

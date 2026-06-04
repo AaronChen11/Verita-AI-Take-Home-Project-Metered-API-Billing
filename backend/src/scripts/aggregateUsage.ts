@@ -34,19 +34,17 @@ async function main() {
       },
     );
 
-    await finishJobRun(pool, jobRunId, result.status, {
-      rangeEnd: result.range.end.toISOString(),
+    const meta = {
       rangeStart: result.range.start.toISOString(),
+      rangeEnd: result.range.end.toISOString(),
       windowsUpserted: result.windowsUpserted,
-    });
-
-    console.log(`Usage aggregation ${result.status}.`);
-    console.log(`Range: ${result.range.start.toISOString()} - ${result.range.end.toISOString()}`);
-    console.log(`Windows upserted: ${result.windowsUpserted}`);
+    };
+    await finishJobRun(pool, jobRunId, result.status, meta);
+    console.log(JSON.stringify({ job: "aggregateUsage", status: result.status, ...meta }));
   } catch (error) {
-    await finishJobRun(pool, jobRunId, "failed", {
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    const message = error instanceof Error ? error.message : "Unknown error";
+    await finishJobRun(pool, jobRunId, "failed", { error: message });
+    console.error(JSON.stringify({ job: "aggregateUsage", status: "failed", error: message }));
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import cors from "cors";
 import express from "express";
 import type { Request, RequestHandler, Response } from "express";
+import { rateLimit } from "express-rate-limit";
 
 import type { EventsRouteDependencies } from "./routes/events.js";
 import { createEventsRouter } from "./routes/events.js";
@@ -19,6 +20,7 @@ export function healthHandler(_req: Request, res: Response) {
 
 export type AppDependencies = {
   frontendUrl?: string;
+  rateLimitEvents?: boolean;
   customerApi?: {
     auth: RequestHandler;
     events: EventsRouteDependencies;
@@ -58,10 +60,22 @@ export function createApp(dependencies: AppDependencies = {}) {
   }
 
   if (dependencies.customerApi) {
+    const eventsLimiter =
+      dependencies.rateLimitEvents === false
+        ? undefined
+        : rateLimit({
+            windowMs: 60 * 1000,
+            limit: 60,
+            standardHeaders: true,
+            legacyHeaders: false,
+            message: { error: "rate_limit_exceeded" },
+            keyGenerator: (req) => req.header("authorization") ?? "anonymous",
+          });
+
     app.use(
       "/v1",
       dependencies.customerApi.auth,
-      createEventsRouter(dependencies.customerApi.events),
+      createEventsRouter(dependencies.customerApi.events, eventsLimiter),
       createInvoicesRouter(dependencies.customerApi.invoices),
       createUsageRouter(dependencies.customerApi.usage),
     );

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import type { Request, Response } from "express";
+import type { Request, RequestHandler, Response } from "express";
 import { z } from "zod";
 
 import type { ApiKeyOwnershipLookup } from "../repositories/apiKeys.js";
@@ -64,8 +64,12 @@ export function createPostEventsHandler(dependencies: EventsRouteDependencies) {
   };
 }
 
-export function createEventsRouter(dependencies: EventsRouteDependencies) {
+export function createEventsRouter(dependencies: EventsRouteDependencies, rateLimiter?: RequestHandler) {
   const router = Router();
+
+  if (rateLimiter) {
+    router.use("/events", rateLimiter);
+  }
 
   router.post("/events", createPostEventsHandler(dependencies));
 
