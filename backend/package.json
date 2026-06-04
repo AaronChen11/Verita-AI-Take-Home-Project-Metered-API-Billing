@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "DOTENV_CONFIG_PATH=../.env tsx watch src/index.ts",
+    "dev:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx watch src/index.ts",
+    "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
@@ -15,9 +17,14 @@
     "aggregate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/aggregateUsage.ts",
     "migrate:up": "node-pg-migrate --envPath ../.env -m src/db/migrations up",
     "migrate:down": "node-pg-migrate --envPath ../.env -m src/db/migrations down",
-    "migrate:create": "node-pg-migrate --envPath ../.env -m src/db/migrations create"
+    "migrate:create": "node-pg-migrate --envPath ../.env -m src/db/migrations create",
+    "migrate:cloud": "node-pg-migrate --envPath ../.env.cloud -m src/db/migrations up",
+    "seed:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/seed.ts",
+    "aggregate:usage:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/aggregateUsage.ts"
   },
   "dependencies": {
+    "@types/cors": "^2.8.19",
+    "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "node-pg-migrate": "^8.0.4",

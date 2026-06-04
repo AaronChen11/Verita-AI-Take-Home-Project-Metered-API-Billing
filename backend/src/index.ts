@@ -25,6 +25,7 @@ const usageEvents = new PostgresUsageEventRepository(pool);
 const usageRead = new PostgresUsageReadRepository(pool);
 
 const app = createApp({
+  frontendUrl: env.FRONTEND_URL,
   customerApi: {
     auth: createCustomerAuthMiddleware(apiKeys, env.API_KEY_PEPPER),
     events: {

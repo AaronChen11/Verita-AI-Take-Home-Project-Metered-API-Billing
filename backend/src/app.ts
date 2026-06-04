@@ -1,3 +1,4 @@
+import cors from "cors";
 import express from "express";
 import type { Request, RequestHandler, Response } from "express";
 
@@ -17,6 +18,7 @@ export function healthHandler(_req: Request, res: Response) {
 }
 
 export type AppDependencies = {
+  frontendUrl?: string;
   customerApi?: {
     auth: RequestHandler;
     events: EventsRouteDependencies;
@@ -32,6 +34,13 @@ export type AppDependencies = {
 
 export function createApp(dependencies: AppDependencies = {}) {
   const app = express();
+
+  app.use(
+    cors({
+      origin: dependencies.frontendUrl ?? "http://localhost:5173",
+      credentials: true,
+    }),
+  );
 
   if (dependencies.paymentWebhooks) {
     app.use(

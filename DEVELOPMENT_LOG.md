@@ -752,3 +752,54 @@ The login page is still intentionally lightweight for the take-home: it validate
 * `npm run typecheck` passed.
 * `npm run build` passed.
 * Browser automation was unavailable in this session, so final visual QA should be done manually in the local browser.
+
+## 2026-06-04: Cloud Deployment Foundation
+
+### Implemented
+
+* Added CORS middleware (`cors` package) to the Express app with a configurable `FRONTEND_URL` origin, defaulting to `localhost:5173` for local development.
+* Added `FRONTEND_URL` as an optional env variable in `env.ts` and wired it through `AppDependencies` and `createApp`.
+* Added `start` script to `backend/package.json` for cloud platforms that build and run `dist/index.js` directly.
+* Added `dev:cloud` script that runs the backend with `DOTENV_CONFIG_PATH=../.env.cloud` for local cloud-DB testing.
+* Added `migrate:cloud`, `seed:cloud`, and `aggregate:usage:cloud` scripts pointing at `.env.cloud`.
+* Added root-level `dev:backend:cloud` and `migrate:cloud` shortcuts in the workspace `package.json`.
+* Added `.env.cloud` (gitignored) as the local cloud credential file with Supabase Session Pooler URL.
+* Added `.env.cloud` to `.gitignore`.
+* Established a Supabase Postgres project and ran both schema migrations successfully.
+* Seeded demo data against Supabase; received and saved the cloud demo API key.
+* Ran usage aggregation against Supabase; 48 hourly windows upserted.
+* Diagnosed and resolved a `DOTENV_CONFIG_PATH` override issue caused by npm scripts hardcoding `../.env`, which caused `dev:cloud` to connect to the wrong database.
+* Diagnosed and resolved a Supabase Session Pooler username URL-encoding issue (`postgres.project_id` requires `%2E` encoding in some clients, and password case sensitivity).
+* Verified full API stack against Supabase: `/health`, `/v1/invoices`, and `/v1/usage` all return correct seeded data with cloud credentials.
+
+### Design Notes
+
+Two separate workflows are maintained: `npm run dev:backend` for local Docker Postgres and `npm run dev:backend:cloud` for Supabase. The `start` script (`node dist/index.js`) is used by cloud platforms, which inject env vars directly without a `.env` file. The `DOTENV_CONFIG_PATH` pattern is retained for local workflows and removed from the production path entirely.
+
+The Supabase Session Pooler was chosen over the Direct connection because most cloud hosting platforms use IPv4 networks, and Session Pooler is the recommended fallback for IPv4 environments while still supporting long-lived Express server connections and DDL migrations.
+
+### Verification
+
+* `npm run migrate:cloud` applied both migrations to Supabase successfully.
+* `npm run seed:cloud` inserted demo customer, API key, invoices, and 216 usage events.
+* `npm --workspace backend run aggregate:usage:cloud` upserted 48 hourly usage windows.
+* `GET /health` → `{"ok":true}`.
+* `GET /v1/invoices` with cloud API key → 3 seeded invoices returned.
+* `GET /v1/usage` with cloud API key → daily usage buckets returned.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-04: Stripe Removal
+
+### Implemented
+
+* Removed the Stripe integration added during earlier exploration.
+* Reverted `backend/src/routes/paymentWebhooks.ts` to the original HMAC-only mock webhook handler.
+* Removed `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` from `env.ts`, `index.ts`, and `.env.cloud`.
+* Removed `PAYMENT_WEBHOOK_SECRET` optional logic and restored it as a required field.
+* Uninstalled the `stripe` npm package from backend and frontend dependencies.
+* Cleaned `STRIPE_*` entries from `.env.example`.
+
+### Design Notes
+
+Stripe was partially integrated (webhook verification and event handling) but the outbound flow — creating Stripe invoices when billing periods close and attaching `metadata.internal_invoice_id` — was never implemented. A half-integrated payment processor adds more correctness risk than leaving the mock webhook in place for the take-home submission. The mock webhook endpoint remains fully functional for local demo and review purposes.

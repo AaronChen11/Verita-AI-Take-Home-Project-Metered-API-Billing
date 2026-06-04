@@ -7,6 +7,7 @@ const envSchema = z.object({
   OPS_SHARED_SECRET: z.string().min(1),
   PAYMENT_WEBHOOK_SECRET: z.string().min(1),
   API_KEY_PEPPER: z.string().min(1),
+  FRONTEND_URL: z.string().optional(),
 });
 
 export type AppEnv = z.infer<typeof envSchema>;

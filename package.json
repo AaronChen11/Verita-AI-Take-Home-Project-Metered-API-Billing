@@ -7,6 +7,7 @@
   ],
   "scripts": {
     "dev:backend": "npm --workspace backend run dev",
+    "dev:backend:cloud": "npm --workspace backend run dev:cloud",
     "dev:frontend": "npm --workspace frontend run dev",
     "seed": "npm --workspace backend run seed",
     "generate:usage": "npm --workspace backend run generate:usage",
@@ -15,6 +16,8 @@
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
-    "test:integration": "npm --workspace backend run test:integration"
+    "test:integration": "npm --workspace backend run test:integration",
+    "migrate:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run migrate:cloud",
+    "seed:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run seed:cloud"
   }
 }
