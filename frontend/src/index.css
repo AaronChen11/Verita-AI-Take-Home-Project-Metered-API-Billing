@@ -1,23 +1,19 @@
 :root {
-  --paper: #f4ead6;
-  --panel: rgba(255, 250, 239, 0.9);
-  --ink: #30271f;
-  --muted: #7d705f;
-  --line: rgba(48, 39, 31, 0.16);
-  --gold: #f0b140;
-  --green: #4b896f;
-  --mint: #d9f1df;
-  --shadow: 0 24px 80px rgba(48, 39, 31, 0.14);
-  --display: Georgia, 'Times New Roman', serif;
-  --sans: 'Avenir Next', 'Trebuchet MS', sans-serif;
+  --paper: #f0ebe0;
+  --panel: #faf7f2;
+  --ink: #1c1610;
+  --muted: #7a6858;
+  --line: rgba(28, 22, 16, 0.09);
+  --burgundy: #7a1f2e;
+  --dark-surface: #590e1d;
+  --shadow: 0 2px 16px rgba(28, 22, 16, 0.07);
+  --display: 'Cormorant Garamond', Georgia, serif;
+  --sans: 'DM Sans', 'Avenir Next', sans-serif;
   --mono: 'SFMono-Regular', Consolas, monospace;
 
   color: var(--ink);
   font: 16px/1.5 var(--sans);
-  background:
-    radial-gradient(circle at 12% 18%, rgba(240, 177, 64, 0.34), transparent 28%),
-    radial-gradient(circle at 90% 12%, rgba(75, 137, 111, 0.28), transparent 30%),
-    linear-gradient(135deg, #f8eedb 0%, #ead8b9 55%, #d7e7cf 100%);
+  background: var(--paper);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -48,9 +44,9 @@ h1,
 h2 {
   color: inherit;
   font-family: var(--display);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  line-height: 0.95;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 0.98;
 }
 
 h1 {
@@ -60,4 +56,11 @@ h1 {
 
 h2 {
   font-size: clamp(28px, 3vw, 44px);
+}
+
+h1 em,
+h2 em {
+  color: var(--burgundy);
+  font-style: italic;
+  font-weight: 400;
 }

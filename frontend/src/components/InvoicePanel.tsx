@@ -14,7 +14,7 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
       <div className="panel invoice-list">
         <div className="panel-heading">
           <div>
-            <p className="eyebrow">Invoices</p>
+            <p className="eyebrow">— Invoices</p>
             <h2>Recent statements</h2>
           </div>
           <span className="pill">{invoices.length}</span>
@@ -35,7 +35,7 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
                   {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
                 </span>
                 <strong>{formatMoney(invoice.total_cents)}</strong>
-                <em>{invoice.status}</em>
+                <em data-status={invoice.status}>{invoice.status}</em>
               </button>
             ))}
           </div>
@@ -43,13 +43,13 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
       </div>
 
       <div className="panel invoice-detail">
-        <p className="eyebrow">Invoice detail</p>
+        <p className="eyebrow">— Invoice detail</p>
         {!selectedInvoice ? (
           <p className="muted">Select an invoice to inspect line items and credits.</p>
         ) : (
           <>
             <div className="invoice-total">
-              <span>{selectedInvoice.status}</span>
+              <em data-status={selectedInvoice.status}>{selectedInvoice.status}</em>
               <strong>{formatMoney(selectedInvoice.total_cents)}</strong>
             </div>
 
@@ -65,8 +65,14 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
 
             <div className="totals">
               <span>Subtotal {formatMoney(selectedInvoice.subtotal_cents)}</span>
-              <span>Credits {formatMoney(selectedInvoice.credits_cents)}</span>
             </div>
+
+            {selectedInvoice.credits_cents > 0 ? (
+              <div className="credit-applied">
+                <span>Credits applied</span>
+                <strong>− {formatMoney(selectedInvoice.credits_cents)}</strong>
+              </div>
+            ) : null}
           </>
         )}
       </div>

@@ -635,3 +635,100 @@ The integration suite is intentionally separate from default unit tests because 
 * `npm run lint` passed.
 * `npm run typecheck` passed.
 * `npm run build` passed.
+
+## 2026-06-03: Verita-Aligned UI Restyle
+
+### Implemented
+
+* Replaced the yellow/green visual system with a Verita-inspired linen, burgundy, warm black, and hairline-border palette.
+* Added Cormorant Garamond and DM Sans font loading for the frontend.
+* Reduced large rounded corners and heavy shadows to restrained 8-12px radii and light shadows.
+* Removed hero and usage-chart gradients in favor of solid near-black burgundy hero surfaces and burgundy accents.
+* Updated dashboard and ops hero headings to use roman plus italic display typography.
+* Added invoice status badge color states, highlighted applied credits, styled override markers, and normalized audit detail toggles.
+* Raised the frontend build chunk warning limit to fit the Recharts-powered demo bundle without masking genuinely large bundles.
+
+### Design Notes
+
+The restyle keeps the existing product flow and component structure intact while aligning the visual language with the Verita references: serif-led typography, small uppercase labels, quiet surfaces, burgundy calls to action, and minimal ornament.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* Browser automation was unavailable in this session, so final visual QA should be done manually in the local browser.
+
+## 2026-06-04: Recharts Line Chart And Usage Preview
+
+### Implemented
+
+* Replaced the CSS bar chart in `UsageChart` with a Recharts `<LineChart>` using `type="monotone"` for a smooth curve.
+* Added a custom `<Tooltip>` component styled with the design system variables (panel background, Cormorant Garamond for the value, DM Sans for labels).
+* Added a dashed burgundy cursor line and a filled dot on the active data point.
+* Added a horizontal-only `<CartesianGrid>` and Y-axis formatter that abbreviates values above 1,000 to `k`.
+* Removed the old `.usage-bars`, `.usage-bar`, and `.chart-axis` CSS and replaced them with `.chart-tooltip` styles.
+* Added 48-point mock hourly data in `App.tsx` that renders a usage chart preview in the customer empty state so the visualization can be evaluated without seeding a database.
+* Installed `recharts` as a frontend dependency.
+
+### Design Notes
+
+The smooth line chart better communicates usage trends over time compared to a bar chart. The mock data in the empty state allows visual QA of the chart without requiring a backend connection, and is clearly separated from the live data path.
+
+The Recharts bundle adds roughly 150 kB to the production build. The chunk size warning threshold was raised to 600 kB to acknowledge this intentional dependency without suppressing future genuine size alerts.
+
+### Verification
+
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-04: Functional Hero Cards
+
+### Implemented
+
+* Replaced the decorative `CustomerDashboard` hero with a live "Current Cycle" widget showing current period label, invoice total, billable units, a four-stage progress bar (Usage → Aggregated → Invoiced → Paid), and a status sentence.
+* Derived the hero state from already-loaded `invoices[0]` and `usage` bucket sum — no additional API calls.
+* Added helper functions `getCurrentStage`, `getStatusCopy`, and `formatPeriod` for the customer hero logic.
+* Replaced the decorative `OpsConsole` hero with a live operational summary showing total customer count, reviewed count, and anomaly count.
+* Added `anomalyMap` state to track per-customer anomaly status as ops users browse customer details.
+* Updated `loadCustomerDetail` to write each customer's anomaly flag into `anomalyMap` on load.
+* Added status text that updates to flag abnormal usage when any reviewed customer has an anomaly.
+* Moved the actor identity from a separate pill into the hero eyebrow label.
+* Added `.hero-cycle`, `.cycle-amount-row`, `.cycle-amount`, `.cycle-progress-wrap`, `.cycle-bar`, `.cycle-segment`, `.cycle-stages`, `.cycle-status`, `.ops-hero-stats`, and `.ops-hero-stat` CSS classes.
+
+### Design Notes
+
+Both hero cards now show data that changes as the user interacts with the product. The customer hero reflects the current billing state at a glance; the ops hero accumulates anomaly signals as the user browses customers.
+
+The `cycle-amount` uses `font-variant-numeric: tabular-nums` and DM Sans Bold so financial figures render with consistent digit widths on the dark surface.
+
+The four progress-bar stages directly map to `usage_windows` existence, invoice `draft`, invoice `issued`, and invoice `paid` states. This makes the billing pipeline visible without adding a dedicated status API.
+
+### Verification
+
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-04: UI Polish And Bug Fixes
+
+### Implemented
+
+* Fixed ops console content disappearance on customer selection: removed `setDetail(null)` from the customer click handler, added an `isLoadingDetail` state, and replaced instant content removal with a subtle opacity fade on the usage signal panel while the new detail loads.
+* Fixed duplicate credits display in `InvoicePanel`: removed the redundant credits line from the `.totals` row so applied credits appear only in the dedicated `credit-applied` block.
+* Changed the minus sign in the credit-applied display from a hyphen to a proper Unicode minus (`−`) for typographic correctness in financial contexts.
+* Redesigned the topbar from a floating card to a full-width hairline nav matching the Verita site: removed border-radius and box shadow, added a bottom hairline border, and extended the bar edge-to-edge.
+* Replaced the `MB` monogram mark with an uppercase wordmark using DM Sans tracked caps.
+* Simplified the view switcher from a background-pill toggle to plain text links where the active state is burgundy bold text, matching the Verita navigation style.
+* Added `.panel-refreshing` CSS class with opacity transition for the detail reload state.
+
+### Design Notes
+
+The ops console disappearance bug was caused by the previous `setDetail(null)` call clearing rendered sections before the network response arrived. Keeping stale data visible during the transition is preferable to a blank panel, particularly for a tool where context continuity matters during investigation.
+
+The topbar nav pattern follows the Verita site structure: no background card, single hairline separator, and text-based active states. This reduces visual weight at the top of the page and lets the hero card carry more prominence.
+
+### Verification
+
+* `npm run typecheck` passed.
+* `npm run build` passed.

@@ -19,11 +19,13 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
   const [customers, setCustomers] = useState<OpsCustomerSummary[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detail, setDetail] = useState<OpsCustomerDetail | null>(null)
+  const [anomalyMap, setAnomalyMap] = useState<Map<string, boolean>>(new Map())
   const [creditForm, setCreditForm] = useState({ amountCents: '500', invoiceId: '', reason: '', idempotencyKey: '' })
   const [overrideForm, setOverrideForm] = useState({ amountCents: '', invoiceId: '', lineItemId: '', reason: '' })
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -68,12 +70,14 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
     let cancelled = false
 
     async function loadCustomerDetail() {
+      setIsLoadingDetail(true)
       setError(null)
       try {
         const response = await fetchOpsCustomerDetail(opsToken, customerId)
         if (cancelled) return
 
         setDetail(response.data)
+        setAnomalyMap((prev) => new Map(prev).set(customerId, response.data.usage.anomaly))
         setCreditForm((current) => ({
           ...current,
           invoiceId: current.invoiceId || response.data.invoices[0]?.id || '',
@@ -87,6 +91,8 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
         if (!cancelled) {
           setError(caught instanceof Error ? caught.message : 'Failed to load customer detail')
         }
+      } finally {
+        if (!cancelled) setIsLoadingDetail(false)
       }
     }
 
@@ -154,15 +160,39 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
     }
   }
 
+  const anomalyCount = [...anomalyMap.values()].filter(Boolean).length
+  const reviewedCount = anomalyMap.size
+
+  const heroStatus = anomalyCount > 0
+    ? `${anomalyCount} customer${anomalyCount > 1 ? 's' : ''} showing abnormal usage — review before billing.`
+    : reviewedCount > 0
+      ? 'All reviewed customers within normal usage range.'
+      : 'Select a customer to begin inspection.'
+
   return (
     <main className="dashboard-shell ops-shell">
       <section className="hero-card ops-hero">
-        <div>
-          <p className="eyebrow">Ops console</p>
-          <h1>Audit first, mutate carefully.</h1>
-          <p className="hero-copy">Inspect customer billing state, issue invoice-bound credits, and override draft or issued line items.</p>
+        <div className="hero-cycle">
+          <p className="eyebrow">— Ops console · {actor}</p>
+
+          <div className="cycle-amount-row">
+            <span className="cycle-amount">{customers.length}</span>
+            <span className="cycle-meta">customers</span>
+          </div>
+
+          <div className="ops-hero-stats">
+            <div className="ops-hero-stat">
+              <span className="ops-hero-stat-value">{reviewedCount}</span>
+              <span className="ops-hero-stat-label">reviewed</span>
+            </div>
+            <div className={`ops-hero-stat${anomalyCount > 0 ? ' ops-hero-stat-warning' : ''}`}>
+              <span className="ops-hero-stat-value">{anomalyCount}</span>
+              <span className="ops-hero-stat-label">{anomalyCount === 1 ? 'anomaly' : 'anomalies'}</span>
+            </div>
+          </div>
+
+          <p className="cycle-status">{heroStatus}</p>
         </div>
-        <span className="pill">{actor}</span>
       </section>
 
       {error ? <div className="banner error">{error}</div> : null}
@@ -173,7 +203,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
         <div className="panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">Customers</p>
+              <p className="eyebrow">— Customers</p>
               <h2>Tenant list</h2>
             </div>
             <span className="pill">{customers.length}</span>
@@ -185,7 +215,6 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                 key={customer.id}
                 onClick={() => {
                   setSelectedCustomerId(customer.id)
-                  setDetail(null)
                 }}
                 type="button"
               >
@@ -197,8 +226,8 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
           </div>
         </div>
 
-        <div className="panel">
-          <p className="eyebrow">Usage signal</p>
+        <div className={`panel${isLoadingDetail ? ' panel-refreshing' : ''}`}>
+          <p className="eyebrow">— Usage signal</p>
           {!detail ? (
             <p className="muted">Select a customer to view operational signals.</p>
           ) : (
@@ -225,7 +254,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
           <div className="panel">
             <div className="panel-heading">
               <div>
-                <p className="eyebrow">Invoices</p>
+                <p className="eyebrow">— Invoices</p>
                 <h2>{detail.customer.name}</h2>
               </div>
             </div>
@@ -268,7 +297,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
 
           <div className="panel ops-actions">
             <form onSubmit={submitCredit}>
-              <p className="eyebrow">Credit</p>
+              <p className="eyebrow">— Credit</p>
               <input aria-label="Credit invoice id" onChange={(event) => setCreditForm({ ...creditForm, invoiceId: event.target.value })} placeholder="invoice_id" value={creditForm.invoiceId} />
               <input aria-label="Credit amount cents" onChange={(event) => setCreditForm({ ...creditForm, amountCents: event.target.value })} placeholder="amount_cents" type="number" value={creditForm.amountCents} />
               <input aria-label="Credit reason" onChange={(event) => setCreditForm({ ...creditForm, reason: event.target.value })} placeholder="reason" value={creditForm.reason} />
@@ -277,7 +306,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
             </form>
 
             <form onSubmit={submitOverride}>
-              <p className="eyebrow">Line-item override</p>
+              <p className="eyebrow">— Line-item override</p>
               <input aria-label="Override invoice id" onChange={(event) => setOverrideForm({ ...overrideForm, invoiceId: event.target.value })} placeholder="invoice_id" value={overrideForm.invoiceId} />
               <input aria-label="Override line item id" onChange={(event) => setOverrideForm({ ...overrideForm, lineItemId: event.target.value })} placeholder="line_item_id" value={overrideForm.lineItemId} />
               <input aria-label="Override amount cents" onChange={(event) => setOverrideForm({ ...overrideForm, amountCents: event.target.value })} placeholder="amount_cents" type="number" value={overrideForm.amountCents} />
@@ -291,7 +320,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
 
       {detail ? (
         <section className="panel">
-          <p className="eyebrow">Audit trail</p>
+          <p className="eyebrow">— Audit trail</p>
           <div className="audit-list">
             {detail.audit_logs.length === 0 ? <p className="muted">No audit entries yet.</p> : null}
             {detail.audit_logs.map((entry) => (
