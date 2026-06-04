@@ -34,5 +34,6 @@ npm run aggregate:usage
 * `npm run generate:usage`
 * `npm run lint`
 * `npm run seed`
+* `npm run test:integration` (requires local Docker Postgres, migrations, and `.env`)
 * `npm run typecheck`
 * `npm run test`

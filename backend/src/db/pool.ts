@@ -1,6 +1,8 @@
-import { Pool } from "pg";
+import { Pool, types } from "pg";
 
 import { env } from "../config/env.js";
+
+types.setTypeParser(20, (value) => Number.parseInt(value, 10));
 
 let pool: Pool | undefined;
 

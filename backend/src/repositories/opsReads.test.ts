@@ -46,6 +46,45 @@ describe("PostgresOpsReadRepository", () => {
         if (queries.length === 2) {
           return { rows: [{ current_hour_units: "1001", average_hourly_units_last_30_days: "100" }] };
         }
+        if (queries.length === 3) {
+          return {
+            rows: [
+              {
+                id: "00000000-0000-4000-8000-000000000010",
+                period_start: "2026-06-01",
+                period_end: "2026-07-01",
+                status: "issued",
+                total_cents: 10_000,
+                created_at: new Date("2026-06-03T13:00:00Z"),
+                line_items: [
+                  {
+                    id: "00000000-0000-4000-8000-000000000011",
+                    amount_cents: 10_000,
+                    description: "Usage",
+                    is_overridden: false,
+                  },
+                ],
+              },
+            ],
+          };
+        }
+        if (queries.length === 4) {
+          return {
+            rows: [
+              {
+                id: "00000000-0000-4000-8000-000000000020",
+                actor: "ops@example.com",
+                action: "credit.created",
+                entity_type: "invoice",
+                entity_id: "00000000-0000-4000-8000-000000000010",
+                reason: "Test credit",
+                before_value: { totalCents: 10_000 },
+                after_value: { totalCents: 9_500 },
+                created_at: new Date("2026-06-03T14:00:00Z"),
+              },
+            ],
+          };
+        }
 
         return { rows: [] };
       },
@@ -59,13 +98,17 @@ describe("PostgresOpsReadRepository", () => {
         averageHourlyUnitsLast30Days: 100,
         anomaly: true,
       },
-      invoices: [],
-      auditLogs: [],
+      invoices: [{ lineItems: [{ id: "00000000-0000-4000-8000-000000000011" }] }],
+      auditLogs: [{ beforeValue: { totalCents: 10_000 }, afterValue: { totalCents: 9_500 } }],
     });
     expect(queries[1]?.text).toContain("now() - interval '30 days'");
     expect(queries[1]?.values).toEqual(["00000000-0000-4000-8000-000000000001"]);
+    expect(queries[2]?.text).toContain("jsonb_agg");
+    expect(queries[2]?.text).toContain("LEFT JOIN invoice_line_items");
     expect(queries[3]?.text).toContain("FROM invoices");
     expect(queries[3]?.text).toContain("FROM invoice_line_items");
+    expect(queries[3]?.text).toContain("audit_logs.before_value");
+    expect(queries[3]?.text).toContain("audit_logs.after_value");
     expect(queries[3]?.values).toEqual(["00000000-0000-4000-8000-000000000001"]);
   });
 });

@@ -162,6 +162,14 @@ function detail(): OpsCustomerDetail {
         status: "issued",
         totalCents: 10_000,
         createdAt: new Date("2026-06-03T13:00:00Z"),
+        lineItems: [
+          {
+            id: "00000000-0000-4000-8000-000000000011",
+            amountCents: 10_000,
+            description: "Usage",
+            isOverridden: false,
+          },
+        ],
       },
     ],
     auditLogs: [
@@ -172,6 +180,8 @@ function detail(): OpsCustomerDetail {
         entityType: "customer",
         entityId: customerId,
         reason: "Test credit",
+        beforeValue: { totalCents: 10_000 },
+        afterValue: { totalCents: 9_500 },
         createdAt: new Date("2026-06-03T14:00:00Z"),
       },
     ],

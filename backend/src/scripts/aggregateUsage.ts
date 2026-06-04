@@ -21,19 +21,65 @@ function readPositiveIntEnv(name: string, fallback: number) {
 
 async function main() {
   const pool = getPool();
-  const result = await aggregateUsageWindows(
-    {
-      locks: new PostgresAdvisoryLockRunner(pool),
-      usageWindows: new PostgresUsageWindowRepository(pool),
-    },
-    {
-      lookbackHours: readPositiveIntEnv("AGGREGATE_USAGE_LOOKBACK_HOURS", DEFAULT_AGGREGATION_LOOKBACK_HOURS),
-    },
+  const jobRunId = await createJobRun(pool);
+
+  try {
+    const result = await aggregateUsageWindows(
+      {
+        locks: new PostgresAdvisoryLockRunner(pool),
+        usageWindows: new PostgresUsageWindowRepository(pool),
+      },
+      {
+        lookbackHours: readPositiveIntEnv("AGGREGATE_USAGE_LOOKBACK_HOURS", DEFAULT_AGGREGATION_LOOKBACK_HOURS),
+      },
+    );
+
+    await finishJobRun(pool, jobRunId, result.status, {
+      rangeEnd: result.range.end.toISOString(),
+      rangeStart: result.range.start.toISOString(),
+      windowsUpserted: result.windowsUpserted,
+    });
+
+    console.log(`Usage aggregation ${result.status}.`);
+    console.log(`Range: ${result.range.start.toISOString()} - ${result.range.end.toISOString()}`);
+    console.log(`Windows upserted: ${result.windowsUpserted}`);
+  } catch (error) {
+    await finishJobRun(pool, jobRunId, "failed", {
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
+}
+
+async function createJobRun(pool: ReturnType<typeof getPool>) {
+  const result = await pool.query<{ id: string }>(
+    `
+      INSERT INTO job_runs (job_name, status, metadata)
+      VALUES ($1, 'started', '{}'::jsonb)
+      RETURNING id
+    `,
+    ["aggregateUsage"],
   );
 
-  console.log(`Usage aggregation ${result.status}.`);
-  console.log(`Range: ${result.range.start.toISOString()} - ${result.range.end.toISOString()}`);
-  console.log(`Windows upserted: ${result.windowsUpserted}`);
+  return result.rows[0]?.id ?? "";
+}
+
+async function finishJobRun(
+  pool: ReturnType<typeof getPool>,
+  jobRunId: string,
+  status: "failed" | "skipped" | "succeeded",
+  metadata: Record<string, unknown>,
+) {
+  await pool.query(
+    `
+      UPDATE job_runs
+      SET status = $2,
+          finished_at = now(),
+          metadata = $3
+      WHERE id = $1
+    `,
+    [jobRunId, status, JSON.stringify(metadata)],
+  );
 }
 
 if (process.env.NODE_ENV !== "test" && isDirectScript("aggregateUsage.ts")) {

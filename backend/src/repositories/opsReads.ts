@@ -26,6 +26,14 @@ export type OpsInvoiceSummary = {
   status: string;
   totalCents: number;
   createdAt: Date;
+  lineItems: OpsInvoiceLineItem[];
+};
+
+export type OpsInvoiceLineItem = {
+  id: string;
+  description: string;
+  amountCents: number;
+  isOverridden: boolean;
 };
 
 export type OpsAuditLogEntry = {
@@ -35,6 +43,8 @@ export type OpsAuditLogEntry = {
   entityType: string;
   entityId: string;
   reason: string;
+  beforeValue: unknown;
+  afterValue: unknown;
   createdAt: Date;
 };
 
@@ -128,15 +138,30 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
       this.pool.query<OpsInvoiceRow>(
         `
           SELECT
-            id,
-            period_start,
-            period_end,
-            status,
-            total_cents,
-            created_at
+            invoices.id,
+            invoices.period_start,
+            invoices.period_end,
+            invoices.status,
+            invoices.total_cents,
+            invoices.created_at,
+            COALESCE(
+              jsonb_agg(
+                jsonb_build_object(
+                  'id', invoice_line_items.id,
+                  'description', invoice_line_items.description,
+                  'amount_cents', invoice_line_items.amount_cents,
+                  'is_overridden', invoice_line_items.is_overridden
+                )
+                ORDER BY invoice_line_items.created_at, invoice_line_items.id
+              ) FILTER (WHERE invoice_line_items.id IS NOT NULL),
+              '[]'::jsonb
+            ) AS line_items
           FROM invoices
-          WHERE customer_id = $1
-          ORDER BY created_at DESC, id DESC
+          LEFT JOIN invoice_line_items
+            ON invoice_line_items.invoice_id = invoices.id
+          WHERE invoices.customer_id = $1
+          GROUP BY invoices.id
+          ORDER BY invoices.created_at DESC, invoices.id DESC
           LIMIT 10
         `,
         [customerId],
@@ -150,6 +175,8 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
             audit_logs.entity_type,
             audit_logs.entity_id,
             audit_logs.reason,
+            audit_logs.before_value,
+            audit_logs.after_value,
             audit_logs.created_at
           FROM audit_logs
           WHERE audit_logs.entity_id = $1
@@ -201,6 +228,7 @@ type OpsInvoiceRow = {
   status: string;
   total_cents: number;
   created_at: Date;
+  line_items: OpsInvoiceLineItemRow[] | string;
 };
 
 type OpsAuditLogRow = {
@@ -210,7 +238,16 @@ type OpsAuditLogRow = {
   entity_type: string;
   entity_id: string;
   reason: string;
+  before_value: unknown;
+  after_value: unknown;
   created_at: Date;
+};
+
+type OpsInvoiceLineItemRow = {
+  id: string;
+  description: string;
+  amount_cents: number;
+  is_overridden: boolean;
 };
 
 function toOpsCustomerSummary(row: OpsCustomerRow): OpsCustomerSummary {
@@ -242,6 +279,7 @@ function toOpsInvoiceSummary(row: OpsInvoiceRow): OpsInvoiceSummary {
     status: row.status,
     totalCents: row.total_cents,
     createdAt: row.created_at,
+    lineItems: parseLineItems(row.line_items),
   };
 }
 
@@ -253,8 +291,21 @@ function toOpsAuditLogEntry(row: OpsAuditLogRow): OpsAuditLogEntry {
     entityType: row.entity_type,
     entityId: row.entity_id,
     reason: row.reason,
+    beforeValue: row.before_value,
+    afterValue: row.after_value,
     createdAt: row.created_at,
   };
+}
+
+function parseLineItems(value: OpsInvoiceLineItemRow[] | string): OpsInvoiceLineItem[] {
+  const rows = typeof value === "string" ? (JSON.parse(value) as OpsInvoiceLineItemRow[]) : value;
+
+  return rows.map((row) => ({
+    id: row.id,
+    description: row.description,
+    amountCents: row.amount_cents,
+    isOverridden: row.is_overridden,
+  }));
 }
 
 function toDateOnly(value: Date | string) {

@@ -279,6 +279,12 @@ function serializeInvoiceSummary(invoice: OpsInvoiceSummary) {
     status: invoice.status,
     total_cents: invoice.totalCents,
     created_at: invoice.createdAt.toISOString(),
+    line_items: invoice.lineItems.map((lineItem) => ({
+      id: lineItem.id,
+      description: lineItem.description,
+      amount_cents: lineItem.amountCents,
+      is_overridden: lineItem.isOverridden,
+    })),
   };
 }
 
@@ -299,6 +305,8 @@ function serializeAuditLogEntry(auditLog: OpsAuditLogEntry) {
     entity_type: auditLog.entityType,
     entity_id: auditLog.entityId,
     reason: auditLog.reason,
+    before_value: auditLog.beforeValue,
+    after_value: auditLog.afterValue,
     created_at: auditLog.createdAt.toISOString(),
   };
 }

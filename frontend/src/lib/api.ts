@@ -60,6 +60,12 @@ export type OpsCustomerDetail = {
     status: string
     total_cents: number
     created_at: string
+    line_items: Array<{
+      id: string
+      description: string
+      amount_cents: number
+      is_overridden: boolean
+    }>
   }>
   audit_logs: Array<{
     id: string
@@ -68,6 +74,8 @@ export type OpsCustomerDetail = {
     entity_type: string
     entity_id: string
     reason: string
+    before_value: unknown
+    after_value: unknown
     created_at: string
   }>
 }

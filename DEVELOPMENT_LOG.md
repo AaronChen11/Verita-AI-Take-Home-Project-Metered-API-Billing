@@ -547,3 +547,91 @@ The in-app browser automation surface was unavailable in this session, so UI int
 * `GET /ops/customers/:id` returned usage summary, invoice summaries, and related audit logs.
 * `POST /ops/customers/:id/credits` returned updated invoice totals.
 * `PATCH /ops/invoices/:invoiceId/line-items/:lineItemId` succeeded for an issued invoice and returned 409 for a paid invoice.
+
+## 2026-06-03: DESIGN.md Finalization Pass
+
+### Implemented
+
+* Updated `DESIGN.md` from the accumulated development log.
+* Documented the local demo flow, including `npm run aggregate:usage`.
+* Documented the host `5433` Postgres mapping used to avoid local port conflicts.
+* Updated verification status with live Docker, migration, seed, aggregation, API, and frontend shell results.
+* Removed stale limitations that were resolved during live verification.
+
+### Design Notes
+
+The design document now separates automated verification, live local API verification, and the remaining manual browser walkthrough. This keeps the submission honest about what was machine-verified and what a reviewer can reproduce in the browser.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-03: DESIGN.md Rubric Feedback Pass
+
+### Implemented
+
+* Added a dedicated `Trade-offs` section covering recomputation, API key hashing, invoice-bound credits, and lightweight ops auth.
+* Rewrote the threat model around hostile customer, hostile ops user, and compromised webhook scenarios.
+* Replaced generic failure-mode notes with production-scale breakpoints and concrete fixes.
+* Added an `Observability` section with structured metrics and alert conditions.
+
+### Design Notes
+
+This pass addresses reviewer-facing rubric gaps without changing runtime behavior. The new sections make the chosen MVP shortcuts explicit and show the concrete production path for scale, security, and operations.
+
+### Verification
+
+Documentation-only change. Full test/lint/typecheck/build verification should be run before commit.
+
+## 2026-06-03: Ops UX And Scale Feedback Pass
+
+### Implemented
+
+* Added ops credit and line-item override confirmation prompts in the frontend.
+* Added invoice line items to `GET /ops/customers/:id` so ops users can see and click line item IDs.
+* Returned audit log before/after values from ops customer detail.
+* Added frontend rendering for invoice IDs, line item IDs, and audit before/after JSON.
+* Added a migration that promotes money and usage counters to `bigint`.
+* Added active API key hash and audit entity lookup indexes.
+* Added `job_runs` persistence for the local usage aggregation command.
+
+### Design Notes
+
+The ops UI now exposes the identifiers required to manually test line-item overrides instead of forcing reviewers to know seeded IDs. Confirmation prompts make money-moving actions harder to trigger accidentally.
+
+The schema changes are isolated in a new migration rather than mutating the initial migration. The Postgres pool parses `int8` values back to numbers so the API response shape remains stable after the counter columns become `bigint`.
+
+### Verification
+
+* `npm run test` passed.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* `npm --workspace backend run migrate:up` applied the scale/index migration successfully.
+* `npm run aggregate:usage` recorded a successful `aggregateUsage` row in `job_runs`.
+* Live ops customer detail returned invoice line items and audit before/after values.
+
+## 2026-06-03: DESIGN.md Trim And DB Integration Tests
+
+### Implemented
+
+* Trimmed `DESIGN.md` by removing repeated summary and verification sections.
+* Added a dedicated `test:integration` command for real Postgres integration tests.
+* Added integration coverage for `usage_events.request_id` deduplication, `usage_windows` recomputation, ops `jsonb_agg` line item shape, and credit transaction/audit behavior.
+* Documented the integration test command in README.
+
+### Design Notes
+
+The integration suite is intentionally separate from default unit tests because it requires Docker Postgres and migrated schema. This keeps `npm run test` fast and deterministic while still giving reviewers a real database verification path.
+
+### Verification
+
+* `DESIGN.md` is 2,485 words.
+* `npm run test` passed.
+* `npm run test:integration` passed against local Docker Postgres.
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.

@@ -106,6 +106,13 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
   async function submitCredit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!selectedCustomerId) return
+    if (
+      !window.confirm(
+        `Issue credit of ${formatMoney(Number(creditForm.amountCents))} to invoice ${creditForm.invoiceId}?\n\nReason: ${creditForm.reason}`,
+      )
+    ) {
+      return
+    }
     setMessage(null)
     setError(null)
     try {
@@ -124,6 +131,13 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
 
   async function submitOverride(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (
+      !window.confirm(
+        `Override line item ${overrideForm.lineItemId} to ${formatMoney(Number(overrideForm.amountCents))}?\n\nReason: ${overrideForm.reason}`,
+      )
+    ) {
+      return
+    }
     setMessage(null)
     setError(null)
     try {
@@ -220,9 +234,33 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                 <div className="invoice-row" key={invoice.id}>
                   <span>
                     {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
+                    <code>{invoice.id}</code>
                   </span>
                   <strong>{formatMoney(invoice.total_cents)}</strong>
                   <em>{invoice.status}</em>
+                  <div className="invoice-line-items">
+                    {invoice.line_items.length === 0 ? <small>No line items</small> : null}
+                    {invoice.line_items.map((lineItem) => (
+                      <button
+                        key={lineItem.id}
+                        onClick={() => {
+                          setCreditForm((current) => ({ ...current, invoiceId: invoice.id }))
+                          setOverrideForm((current) => ({
+                            ...current,
+                            amountCents: current.amountCents || String(lineItem.amount_cents),
+                            invoiceId: invoice.id,
+                            lineItemId: lineItem.id,
+                          }))
+                        }}
+                        type="button"
+                      >
+                        <span>{lineItem.description}</span>
+                        <code>{lineItem.id}</code>
+                        <strong>{formatMoney(lineItem.amount_cents)}</strong>
+                        {lineItem.is_overridden ? <em>overridden</em> : null}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -262,6 +300,10 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                 <span>{entry.actor}</span>
                 <span>{entry.reason}</span>
                 <em>{formatDate(entry.created_at)}</em>
+                <details>
+                  <summary>before / after</summary>
+                  <pre>{JSON.stringify({ before: entry.before_value, after: entry.after_value }, null, 2)}</pre>
+                </details>
               </div>
             ))}
           </div>
