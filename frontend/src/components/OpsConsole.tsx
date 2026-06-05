@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import {
   fetchOpsCustomerDetail,
@@ -16,11 +16,30 @@ type OpsConsoleProps = {
   opsToken: string
 }
 
+function shortId(id: string) {
+  if (id.length <= 16) return id
+  return `${id.slice(0, 8)}…${id.slice(-4)}`
+}
+
+function formatPeriod(value: string | null) {
+  if (!value) return 'current period'
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(value))
+}
+
 export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
   const [customers, setCustomers] = useState<OpsCustomerSummary[]>([])
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null)
   const [detail, setDetail] = useState<OpsCustomerDetail | null>(null)
+  const [detailCache, setDetailCache] = useState<Map<string, OpsCustomerDetail>>(new Map())
   const [anomalyMap, setAnomalyMap] = useState<Map<string, boolean>>(new Map())
+  const [openInvoiceId, setOpenInvoiceId] = useState<string | null>(null)
+  const [adjustmentTab, setAdjustmentTab] = useState<'credit' | 'override'>('credit')
+  const [pickedLineItemId, setPickedLineItemId] = useState<string | null>(null)
   const [creditForm, setCreditForm] = useState({ amountCents: '500', invoiceId: '', reason: '', idempotencyKey: '' })
   const [overrideForm, setOverrideForm] = useState({ amountCents: '', invoiceId: '', lineItemId: '', reason: '' })
   const [message, setMessage] = useState<string | null>(null)
@@ -64,6 +83,42 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
   }, [opsToken])
 
   useEffect(() => {
+    if (customers.length === 0) return
+    let cancelled = false
+
+    async function loadPortfolioDetails() {
+      const results = await Promise.allSettled(
+        customers.map(async (customer) => fetchOpsCustomerDetail(opsToken, customer.id)),
+      )
+      if (cancelled) return
+
+      const nextCache = new Map<string, OpsCustomerDetail>()
+      const nextAnomalyMap = new Map<string, boolean>()
+      results.forEach((result, index) => {
+        if (result.status !== 'fulfilled') return
+        const customerId = customers[index]?.id
+        if (!customerId) return
+
+        nextCache.set(customerId, result.value.data)
+        nextAnomalyMap.set(customerId, result.value.data.usage.anomaly)
+      })
+
+      setDetailCache(nextCache)
+      setAnomalyMap(nextAnomalyMap)
+      setDetail((current) => {
+        if (!current) return current
+        return nextCache.get(current.customer.id) ?? current
+      })
+    }
+
+    void loadPortfolioDetails()
+
+    return () => {
+      cancelled = true
+    }
+  }, [customers, opsToken])
+
+  useEffect(() => {
     if (selectedCustomerId === null) {
       return
     }
@@ -78,7 +133,14 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
         if (cancelled) return
 
         setDetail(response.data)
+        setDetailCache((prev) => new Map(prev).set(customerId, response.data))
         setAnomalyMap((prev) => new Map(prev).set(customerId, response.data.usage.anomaly))
+        setOpenInvoiceId((current) =>
+          current && response.data.invoices.some((invoice) => invoice.id === current)
+            ? current
+            : (response.data.invoices[0]?.id ?? null),
+        )
+        setPickedLineItemId(null)
         setCreditForm((current) => ({
           ...current,
           invoiceId: current.invoiceId || response.data.invoices[0]?.id || '',
@@ -108,6 +170,8 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
     if (!selectedCustomerId) return
     const response = await fetchOpsCustomerDetail(opsToken, selectedCustomerId)
     setDetail(response.data)
+    setDetailCache((prev) => new Map(prev).set(selectedCustomerId, response.data))
+    setAnomalyMap((prev) => new Map(prev).set(selectedCustomerId, response.data.usage.anomaly))
   }
 
   async function submitCredit(event: React.FormEvent<HTMLFormElement>) {
@@ -161,190 +225,298 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
     }
   }
 
-  const anomalyCount = [...anomalyMap.values()].filter(Boolean).length
-  const reviewedCount = anomalyMap.size
+  function pickLineItem(invoiceId: string, lineItem: OpsCustomerDetail['invoices'][number]['line_items'][number]) {
+    setPickedLineItemId(lineItem.id)
+    setAdjustmentTab('override')
+    setCreditForm((current) => ({ ...current, invoiceId }))
+    setOverrideForm((current) => ({
+      ...current,
+      amountCents: String(lineItem.amount_cents),
+      invoiceId,
+      lineItemId: lineItem.id,
+    }))
+  }
 
-  const heroStatus = anomalyCount > 0
-    ? `${anomalyCount} customer${anomalyCount > 1 ? 's' : ''} showing abnormal usage — review before billing.`
-    : reviewedCount > 0
-      ? 'All reviewed customers within normal usage range.'
-      : 'Select a customer to begin inspection.'
+  const portfolio = useMemo(() => {
+    let outstandingCents = 0
+    let drafts = 0
+    let anomalies = 0
+    let latestIssuedPeriodStart: string | null = null
+    let latestPeriodStart: string | null = null
+
+    for (const cachedDetail of detailCache.values()) {
+      if (cachedDetail.usage.anomaly) anomalies += 1
+      cachedDetail.invoices.forEach((invoice) => {
+        if (invoice.status === 'issued') {
+          outstandingCents += invoice.total_cents
+          if (!latestIssuedPeriodStart || invoice.period_start > latestIssuedPeriodStart) {
+            latestIssuedPeriodStart = invoice.period_start
+          }
+        }
+        if (invoice.status === 'draft') drafts += 1
+        if (invoice.status !== 'void' && (!latestPeriodStart || invoice.period_start > latestPeriodStart)) {
+          latestPeriodStart = invoice.period_start
+        }
+      })
+    }
+
+    return { anomalies, drafts, latestPeriodStart: latestIssuedPeriodStart ?? latestPeriodStart, outstandingCents }
+  }, [detailCache])
+
+  const heroStatusParts = [
+    portfolio.drafts > 0
+      ? `${portfolio.drafts} draft${portfolio.drafts === 1 ? '' : 's'} awaiting issue`
+      : null,
+    portfolio.anomalies > 0
+      ? `${portfolio.anomalies} anomal${portfolio.anomalies === 1 ? 'y' : 'ies'} to review`
+      : null,
+  ].filter(Boolean)
+  const heroStatus =
+    heroStatusParts.length > 0
+      ? `${heroStatusParts.join(' · ')} before billing close.`
+      : 'All loaded customers clear before billing close.'
 
   return (
-    <main className="dashboard-shell ops-shell">
-      <section className="hero-card ops-hero">
-        <div className="hero-cycle">
-          <p className="eyebrow">— Ops console · {actor}</p>
-
-          <div className="cycle-amount-row">
-            <span className="cycle-amount">{customers.length}</span>
-            <span className="cycle-meta">customers</span>
-          </div>
-
-          <div className="ops-hero-stats">
-            <div className="ops-hero-stat">
-              <span className="ops-hero-stat-value">{reviewedCount}</span>
-              <span className="ops-hero-stat-label">reviewed</span>
-            </div>
-            <div className={`ops-hero-stat${anomalyCount > 0 ? ' ops-hero-stat-warning' : ''}`}>
-              <span className="ops-hero-stat-value">{anomalyCount}</span>
-              <span className="ops-hero-stat-label">{anomalyCount === 1 ? 'anomaly' : 'anomalies'}</span>
-            </div>
-          </div>
-
-          <p className="cycle-status">{heroStatus}</p>
+    <main className="dashboard-shell ops-shell opsv2">
+      <section className="opsv2-top">
+        <p className="eyebrow">— Ops console · Billing period · {formatPeriod(portfolio.latestPeriodStart)}</p>
+        <div className="opsv2-top-title">
+          <span className="opsv2-count">{formatMoney(portfolio.outstandingCents)}</span>
+          <span className="opsv2-count-label">outstanding · issued unpaid</span>
         </div>
+        <div className="opsv2-inline-stats">
+          <span className="opsv2-inline-stat">
+            <strong>{customers.length}</strong>Customers
+          </span>
+          <span className="opsv2-inline-stat">
+            <strong>{portfolio.drafts}</strong>
+            {portfolio.drafts === 1 ? 'Draft to issue' : 'Drafts to issue'}
+          </span>
+          <span className={portfolio.anomalies > 0 ? 'opsv2-inline-stat warn' : 'opsv2-inline-stat'}>
+            <strong>{portfolio.anomalies}</strong>
+            {portfolio.anomalies === 1 ? 'Anomaly' : 'Anomalies'}
+          </span>
+        </div>
+        <p className="opsv2-status">{heroStatus}</p>
       </section>
 
       {error ? <div className="banner error">{error}</div> : null}
       {message ? <div className="banner success">{message}</div> : null}
       {isLoading ? <div className="banner">Loading ops state...</div> : null}
 
-      <section className="ops-grid">
-        <div className="panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">— Customers</p>
-              <h2>Tenant list</h2>
-            </div>
-            <span className="pill">{customers.length}</span>
+      <section className="opsv2-body">
+        <aside className="opsv2-side">
+          <div className="opsv2-side-head">
+            <p className="eyebrow">— Customers</p>
+            <span className="opsv2-side-count">{customers.length}</span>
           </div>
-          <div className="invoice-rows">
-            {customers.map((customer) => (
+          {customers.map((customer) => {
+            const isAnomaly = anomalyMap.get(customer.id) ?? false
+            return (
               <button
-                className={customer.id === selectedCustomerId ? 'invoice-row selected' : 'invoice-row'}
+                className={customer.id === selectedCustomerId ? 'opsv2-tenant active' : 'opsv2-tenant'}
                 key={customer.id}
-                onClick={() => {
-                  setSelectedCustomerId(customer.id)
-                }}
+                onClick={() => setSelectedCustomerId(customer.id)}
                 type="button"
               >
-                <span>{customer.name}</span>
-                <strong>{customer.price_plan_name}</strong>
-                <em>{customer.email}</em>
+                <span className={isAnomaly ? 'opsv2-dot anomaly' : 'opsv2-dot'} title={isAnomaly ? 'Anomaly' : 'Normal'} />
+                <span className="opsv2-tinfo">
+                  <span className="opsv2-tname">{customer.name}</span>
+                  <span className="opsv2-temail">{customer.email}</span>
+                </span>
+                <span className="opsv2-plan">{customer.price_plan_name}</span>
               </button>
-            ))}
-          </div>
-        </div>
+            )
+          })}
+        </aside>
 
-        <div className={`panel${isLoadingDetail ? ' panel-refreshing' : ''}`}>
-          <p className="eyebrow">— Usage signal</p>
+        <div className={`opsv2-detail${isLoadingDetail ? ' panel-refreshing' : ''}`}>
           {!detail ? (
-            <p className="muted">Select a customer to view operational signals.</p>
+            <section className="opsv2-section">
+              <p className="muted">Select a customer to view operational signals.</p>
+            </section>
           ) : (
-            <div className="ops-metrics">
-              <div>
-                <span>Current hour</span>
-                <strong>{detail.usage.current_hour_units.toLocaleString()}</strong>
-              </div>
-              <div>
-                <span>30-day avg hour</span>
-                <strong>{Math.round(detail.usage.average_hourly_units_last_30_days).toLocaleString()}</strong>
-              </div>
-              <div className={detail.usage.anomaly ? 'danger-metric' : ''}>
-                <span>Anomaly</span>
-                <strong>{detail.usage.anomaly ? '10x+' : 'Normal'}</strong>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {detail ? (
-        <section className="ops-grid">
-          <div className="panel">
-            <div className="panel-heading">
-              <div>
-                <p className="eyebrow">— Invoices</p>
+            <>
+              <div className="opsv2-detail-head">
                 <h2>{detail.customer.name}</h2>
-                <p className="muted">Invoices are generated from hourly usage windows by the invoice generation job.</p>
+                <span className="opsv2-plan">{detail.customer.price_plan_name}</span>
               </div>
-            </div>
-            <div className="invoice-rows">
-              {detail.invoices.map((invoice) => (
-                <div className="invoice-row" key={invoice.id}>
-                  <span>
-                    {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
-                    <code>{invoice.id}</code>
-                  </span>
-                  <strong>{formatMoney(invoice.total_cents)}</strong>
-                  <em>{invoice.status}</em>
-                  <div className="invoice-line-items">
-                    {invoice.line_items.length === 0 ? <small>No line items</small> : null}
-                    {invoice.line_items.map((lineItem) => (
+
+              <div className="opsv2-kpis">
+                <div className="opsv2-kpi">
+                  <div className="k-label">Current hour</div>
+                  <div className="k-value">{detail.usage.current_hour_units.toLocaleString()}</div>
+                </div>
+                <div className="opsv2-kpi">
+                  <div className="k-label">30-day avg / hr</div>
+                  <div className="k-value">{Math.round(detail.usage.average_hourly_units_last_30_days).toLocaleString()}</div>
+                </div>
+                <div className={detail.usage.anomaly ? 'opsv2-kpi alert' : 'opsv2-kpi'}>
+                  <div className="k-label">Anomaly</div>
+                  <div className="k-value">{detail.usage.anomaly ? '10x+' : 'Normal'}</div>
+                </div>
+              </div>
+
+              <section className="opsv2-section">
+                <div className="opsv2-section-head">
+                  <div>
+                    <p className="eyebrow">— Invoices</p>
+                    <p className="muted">Invoices are generated from hourly usage windows by the invoice generation job.</p>
+                  </div>
+                </div>
+                {detail.invoices.length === 0 ? <p className="opsv2-empty">No invoices for this customer.</p> : null}
+                {detail.invoices.map((invoice) => {
+                  const isOpen = openInvoiceId === invoice.id
+                  return (
+                    <div key={invoice.id}>
                       <button
-                        key={lineItem.id}
-                        onClick={() => {
-                          setCreditForm((current) => ({ ...current, invoiceId: invoice.id }))
-                          setOverrideForm((current) => ({
-                            ...current,
-                            amountCents: current.amountCents || String(lineItem.amount_cents),
-                            invoiceId: invoice.id,
-                            lineItemId: lineItem.id,
-                          }))
-                        }}
+                        className="opsv2-inv-row"
+                        onClick={() => setOpenInvoiceId(isOpen ? null : invoice.id)}
                         type="button"
                       >
                         <span>
-                          {lineItem.description}
-                          <small>
-                            {lineItem.units.toLocaleString()} units × {formatUnitPrice(lineItem.unit_price_micros)}
-                          </small>
+                          <span className="opsv2-inv-period">
+                            {formatDate(invoice.period_start)} - {formatDate(invoice.period_end)}
+                          </span>
+                          <span className="opsv2-inv-id">{shortId(invoice.id)}</span>
                         </span>
-                        <code>{lineItem.id}</code>
-                        <strong>{formatMoney(lineItem.amount_cents)}</strong>
-                        {lineItem.is_overridden ? <em>overridden</em> : null}
+                        <em className="pill" data-status={invoice.status}>{invoice.status}</em>
+                        <span className="opsv2-inv-total">{formatMoney(invoice.total_cents)}</span>
+                        <span className="opsv2-chev">{isOpen ? '-' : '+'}</span>
                       </button>
-                    ))}
-                  </div>
+                      {isOpen ? (
+                        <div className="opsv2-li-list">
+                          {invoice.line_items.length === 0 ? <p className="opsv2-empty">No line items</p> : null}
+                          {invoice.line_items.map((lineItem) => (
+                            <button
+                              className={pickedLineItemId === lineItem.id ? 'opsv2-li picked' : 'opsv2-li'}
+                              key={lineItem.id}
+                              onClick={() => pickLineItem(invoice.id, lineItem)}
+                              type="button"
+                            >
+                              <span>
+                                <span className="opsv2-li-desc">
+                                  {lineItem.description}
+                                  {lineItem.is_overridden ? <span className="opsv2-li-tag">overridden</span> : null}
+                                </span>
+                                <span className="opsv2-li-id">{shortId(lineItem.id)}</span>
+                                <span className="opsv2-li-units">
+                                  {lineItem.units.toLocaleString()} units x {formatUnitPrice(lineItem.unit_price_micros)}
+                                </span>
+                              </span>
+                              <span className="opsv2-li-amt">{formatMoney(lineItem.amount_cents)}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                })}
+              </section>
+
+              <section className="opsv2-section">
+                <div className="opsv2-section-head">
+                  <p className="eyebrow">— Adjustments</p>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="opsv2-adjust-tabs">
+                  <button
+                    className={adjustmentTab === 'credit' ? 'opsv2-atab active' : 'opsv2-atab'}
+                    onClick={() => setAdjustmentTab('credit')}
+                    type="button"
+                  >
+                    Credit
+                  </button>
+                  <button
+                    className={adjustmentTab === 'override' ? 'opsv2-atab active' : 'opsv2-atab'}
+                    onClick={() => setAdjustmentTab('override')}
+                    type="button"
+                  >
+                    Override
+                  </button>
+                </div>
 
-          <div className="panel ops-actions">
-            <form onSubmit={submitCredit}>
-              <p className="eyebrow">— Credit</p>
-              <input aria-label="Credit invoice id" onChange={(event) => setCreditForm({ ...creditForm, invoiceId: event.target.value })} placeholder="invoice_id" value={creditForm.invoiceId} />
-              <input aria-label="Credit amount cents" onChange={(event) => setCreditForm({ ...creditForm, amountCents: event.target.value })} placeholder="amount_cents" type="number" value={creditForm.amountCents} />
-              <input aria-label="Credit reason" onChange={(event) => setCreditForm({ ...creditForm, reason: event.target.value })} placeholder="reason" value={creditForm.reason} />
-              <input aria-label="Credit idempotency key" onChange={(event) => setCreditForm({ ...creditForm, idempotencyKey: event.target.value })} placeholder="idempotency_key" value={creditForm.idempotencyKey} />
-              <button type="submit">Issue credit</button>
-            </form>
+                {adjustmentTab === 'credit' ? (
+                  <form className="opsv2-form" onSubmit={submitCredit}>
+                    <div className="opsv2-form-grid">
+                      <label className="opsv2-field">
+                        <span>Invoice</span>
+                        <input aria-label="Credit invoice id" onChange={(event) => setCreditForm({ ...creditForm, invoiceId: event.target.value })} placeholder="invoice_id" value={creditForm.invoiceId} />
+                      </label>
+                      <label className="opsv2-field">
+                        <span>Amount (cents)</span>
+                        <input aria-label="Credit amount cents" onChange={(event) => setCreditForm({ ...creditForm, amountCents: event.target.value })} placeholder="500" type="number" value={creditForm.amountCents} />
+                      </label>
+                    </div>
+                    <label className="opsv2-field">
+                      <span>Reason</span>
+                      <input aria-label="Credit reason" onChange={(event) => setCreditForm({ ...creditForm, reason: event.target.value })} placeholder="Goodwill - incident credit" value={creditForm.reason} />
+                    </label>
+                    <label className="opsv2-field">
+                      <span>Idempotency key</span>
+                      <input aria-label="Credit idempotency key" onChange={(event) => setCreditForm({ ...creditForm, idempotencyKey: event.target.value })} placeholder="credit-..." value={creditForm.idempotencyKey} />
+                    </label>
+                    <button className="opsv2-submit" type="submit">Issue credit</button>
+                  </form>
+                ) : (
+                  <form className="opsv2-form" onSubmit={submitOverride}>
+                    <div className="opsv2-form-grid">
+                      <label className="opsv2-field">
+                        <span>Invoice</span>
+                        <input aria-label="Override invoice id" onChange={(event) => setOverrideForm({ ...overrideForm, invoiceId: event.target.value })} placeholder="invoice_id" value={overrideForm.invoiceId} />
+                      </label>
+                      <label className="opsv2-field">
+                        <span>Line item</span>
+                        <input aria-label="Override line item id" onChange={(event) => setOverrideForm({ ...overrideForm, lineItemId: event.target.value })} placeholder="line_item_id" value={overrideForm.lineItemId} />
+                      </label>
+                    </div>
+                    <label className="opsv2-field">
+                      <span>New amount (cents)</span>
+                      <input aria-label="Override amount cents" onChange={(event) => setOverrideForm({ ...overrideForm, amountCents: event.target.value })} placeholder="amount_cents" type="number" value={overrideForm.amountCents} />
+                    </label>
+                    <label className="opsv2-field">
+                      <span>Reason</span>
+                      <input aria-label="Override reason" onChange={(event) => setOverrideForm({ ...overrideForm, reason: event.target.value })} placeholder="Corrected after reconciliation" value={overrideForm.reason} />
+                    </label>
+                    <button className="opsv2-submit" type="submit">Override line item</button>
+                    <p className="opsv2-form-note">Tip: click a line item above to auto-fill these fields. Paid invoices are rejected; use credits for post-payment corrections.</p>
+                  </form>
+                )}
+              </section>
 
-            <form onSubmit={submitOverride}>
-              <p className="eyebrow">— Line-item override</p>
-              <input aria-label="Override invoice id" onChange={(event) => setOverrideForm({ ...overrideForm, invoiceId: event.target.value })} placeholder="invoice_id" value={overrideForm.invoiceId} />
-              <input aria-label="Override line item id" onChange={(event) => setOverrideForm({ ...overrideForm, lineItemId: event.target.value })} placeholder="line_item_id" value={overrideForm.lineItemId} />
-              <input aria-label="Override amount cents" onChange={(event) => setOverrideForm({ ...overrideForm, amountCents: event.target.value })} placeholder="amount_cents" type="number" value={overrideForm.amountCents} />
-              <input aria-label="Override reason" onChange={(event) => setOverrideForm({ ...overrideForm, reason: event.target.value })} placeholder="reason" value={overrideForm.reason} />
-              <button type="submit">Override line item</button>
-              <p className="muted">Paid invoices are rejected; use credits for post-payment corrections.</p>
-            </form>
-          </div>
-        </section>
-      ) : null}
-
-      {detail ? (
-        <section className="panel">
-          <p className="eyebrow">— Audit trail</p>
-          <div className="audit-list">
-            {detail.audit_logs.length === 0 ? <p className="muted">No audit entries yet.</p> : null}
-            {detail.audit_logs.map((entry) => (
-              <div className="audit-row" key={entry.id}>
-                <strong>{entry.action}</strong>
-                <span>{entry.actor}</span>
-                <span>{entry.reason}</span>
-                <em>{formatDate(entry.created_at)}</em>
-                <details>
-                  <summary>before / after</summary>
-                  <pre>{JSON.stringify({ before: entry.before_value, after: entry.after_value }, null, 2)}</pre>
-                </details>
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
+              <section className="opsv2-section">
+                <div className="opsv2-section-head">
+                  <p className="eyebrow">— Audit trail</p>
+                </div>
+                {detail.audit_logs.length === 0 ? <p className="opsv2-empty">No audit entries yet.</p> : null}
+                <div className="opsv2-timeline">
+                  {detail.audit_logs.map((entry) => (
+                    <div className="opsv2-tl-item" key={entry.id}>
+                      <div className="opsv2-tl-rail">
+                        <span className="opsv2-tl-tick" />
+                        <span className="opsv2-tl-line" />
+                      </div>
+                      <div className="opsv2-tl-body">
+                        <div className="opsv2-tl-head">
+                          <span>
+                            <span className="opsv2-tl-action">{entry.action}</span>
+                            <span className="opsv2-tl-actor"> · {entry.actor}</span>
+                          </span>
+                          <span className="opsv2-tl-date">{formatDate(entry.created_at)}</span>
+                        </div>
+                        <p className="opsv2-tl-reason">{entry.reason}</p>
+                        <details>
+                          <summary>before / after</summary>
+                          <pre>{JSON.stringify({ before: entry.before_value, after: entry.after_value }, null, 2)}</pre>
+                        </details>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </section>
     </main>
   )
 }

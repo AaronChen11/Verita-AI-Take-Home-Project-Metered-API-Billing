@@ -917,3 +917,24 @@ These tests focus on correctness boundaries rather than happy paths: range limit
 * `npm --workspace backend run test` passed.
 * `npm --workspace backend run typecheck` passed.
 * `npm --workspace backend run lint` passed.
+
+## 2026-06-05: Ops Console V2 Layout
+
+### Implemented
+
+* Reworked the ops console into a master-detail layout with a tenant sidebar and selected-customer detail column.
+* Replaced session-level hero counters with billing rollups: issued-unpaid outstanding balance, draft invoices to issue, and anomalies to review.
+* Added background detail loading so the hero can compute portfolio-level KPI summaries from real ops API data instead of mock fixtures.
+* Converted invoices into accordions with truncated IDs, line-item source context, and click-to-fill adjustment forms.
+* Consolidated credit and override workflows behind tabs while preserving the existing authenticated API calls, confirmations, refresh behavior, and error handling.
+* Reworked audit history into a vertical timeline using the existing immutable audit log data.
+
+### Design Notes
+
+Claude's mock V2 design was translated into the existing React/TypeScript app rather than copied directly. The production component still uses `fetchOpsCustomers`, `fetchOpsCustomerDetail`, `issueOpsCredit`, and `overrideOpsLineItem`; no mock `OPS_CUSTOMERS` or fixed outstanding dollar amount remains.
+
+### Verification
+
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
