@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Pool, PoolClient } from "pg";
 
-import { CreditInvoiceNotFoundError, PostgresCreditRepository } from "./credits.js";
+import { CreditInvoiceNotFoundError, CreditVoidInvoiceError, PostgresCreditRepository } from "./credits.js";
 
 type FakeClient = PoolClient & { released: boolean };
 
@@ -43,6 +43,7 @@ describe("PostgresCreditRepository", () => {
     ]);
     expect(queries[1]?.text).toContain("FOR UPDATE");
     expect(queries[2]?.text).toContain("ON CONFLICT (customer_id, idempotency_key) DO NOTHING");
+    expect(queries[3]?.text).toContain("COALESCE(SUM(amount_cents), 0)::bigint");
     expect(queries[3]?.text).toContain("GREATEST(subtotal_cents - credit_totals.credits_cents, 0)");
     expect(queries[4]?.text).toContain("INSERT INTO audit_logs");
     expect(client.released).toBe(true);
@@ -111,6 +112,17 @@ describe("PostgresCreditRepository", () => {
     expect(queries.map((query) => query.text.trim().split(/\s+/)[0])).toEqual(["BEGIN", "SELECT", "ROLLBACK"]);
     expect(client.released).toBe(true);
   });
+
+  it("rolls back when issuing a credit against a void invoice", async () => {
+    const queries: Array<{ text: string; values?: unknown[] }> = [];
+    const client = createClient(queries, [{ rows: [] }, { rows: [invoiceRow({ status: "void" })] }, { rows: [] }]);
+    const repository = new PostgresCreditRepository(createPool(client));
+
+    await expect(repository.issueCredit(input())).rejects.toBeInstanceOf(CreditVoidInvoiceError);
+
+    expect(queries.map((query) => query.text.trim().split(/\s+/)[0])).toEqual(["BEGIN", "SELECT", "ROLLBACK"]);
+    expect(client.released).toBe(true);
+  });
 });
 
 function input() {
@@ -124,9 +136,10 @@ function input() {
   };
 }
 
-function invoiceRow(overrides: Partial<{ credits_cents: number; total_cents: number }> = {}) {
+function invoiceRow(overrides: Partial<{ status: string; credits_cents: number; total_cents: number }> = {}) {
   return {
     id: invoiceId,
+    status: overrides.status ?? "issued",
     subtotal_cents: 10_000,
     credits_cents: overrides.credits_cents ?? 0,
     total_cents: overrides.total_cents ?? 10_000,

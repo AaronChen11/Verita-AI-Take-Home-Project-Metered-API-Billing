@@ -124,6 +124,26 @@ describe("POST /v1/events handler", () => {
     expect(inserted).toEqual([]);
   });
 
+  it("rejects a mixed batch when any event belongs to another customer's API key", async () => {
+    const foreignApiKeyId = "00000000-0000-4000-8000-000000000099";
+    const payload = validPayload();
+    payload.events.push({
+      request_id: "req_foreign",
+      api_key_id: foreignApiKeyId,
+      endpoint: "/v1/completions",
+      units: 80,
+      timestamp: "2026-06-01T12:04:00Z",
+    });
+    const { dependencies, inserted } = createDependencies({ ownedApiKeyIds: [apiKeyId] });
+    const handler = createPostEventsHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest(payload), response);
+
+    expect(output).toEqual({ status: 403, body: { error: "api_key_not_found" } });
+    expect(inserted).toEqual([]);
+  });
+
   it("rejects invalid event payloads", async () => {
     const { dependencies } = createDependencies();
     const handler = createPostEventsHandler(dependencies);

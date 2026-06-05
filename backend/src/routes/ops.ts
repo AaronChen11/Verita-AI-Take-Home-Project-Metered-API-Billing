@@ -3,7 +3,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 
 import type { CreditRepository } from "../repositories/credits.js";
-import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
+import { CreditInvoiceNotFoundError, CreditVoidInvoiceError } from "../repositories/credits.js";
 import type { LineItemOverrideRepository } from "../repositories/lineItemOverrides.js";
 import {
   OverrideInvoiceNotFoundError,
@@ -135,7 +135,7 @@ export function createIssueCreditHandler(dependencies: OpsRouteDependencies) {
         },
       });
     } catch (error) {
-      if (error instanceof CreditInvoiceNotFoundError) {
+      if (error instanceof CreditInvoiceNotFoundError || error instanceof CreditVoidInvoiceError) {
         res.status(404).json({ error: "invoice_not_found" });
         return;
       }

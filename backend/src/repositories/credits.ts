@@ -30,6 +30,12 @@ export class CreditInvoiceNotFoundError extends Error {
   }
 }
 
+export class CreditVoidInvoiceError extends Error {
+  constructor(invoiceId: string) {
+    super(`Void invoice cannot receive credits: ${invoiceId}`);
+  }
+}
+
 export class PostgresCreditRepository implements CreditRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -86,6 +92,7 @@ type InvoiceTotals = {
 
 type InvoiceTotalsRow = {
   id: string;
+  status?: string;
   subtotal_cents: number;
   credits_cents: number;
   total_cents: number;
@@ -100,7 +107,7 @@ type CreditInsertResult = {
 async function lockInvoice(client: PoolClient, customerId: string, invoiceId: string) {
   const result = await client.query<InvoiceTotalsRow>(
     `
-      SELECT id, subtotal_cents, credits_cents, total_cents
+      SELECT id, status, subtotal_cents, credits_cents, total_cents
       FROM invoices
       WHERE id = $1
         AND customer_id = $2
@@ -112,6 +119,9 @@ async function lockInvoice(client: PoolClient, customerId: string, invoiceId: st
 
   if (!row) {
     throw new CreditInvoiceNotFoundError(invoiceId);
+  }
+  if (row.status === "void") {
+    throw new CreditVoidInvoiceError(invoiceId);
   }
 
   return toInvoiceTotals(row);
@@ -182,7 +192,7 @@ async function recalculateInvoiceTotals(client: PoolClient, invoiceId: string) {
   const result = await client.query<InvoiceTotalsRow>(
     `
       WITH credit_totals AS (
-        SELECT COALESCE(SUM(amount_cents), 0)::integer AS credits_cents
+        SELECT COALESCE(SUM(amount_cents), 0)::bigint AS credits_cents
         FROM credits
         WHERE invoice_id = $1
       )

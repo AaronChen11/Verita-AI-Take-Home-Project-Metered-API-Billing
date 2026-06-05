@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Pool, PoolClient } from "pg";
 
 import {
+  OverrideInvoiceNotFoundError,
   OverrideLineItemNotFoundError,
   OverridePaidInvoiceError,
   PostgresLineItemOverrideRepository,
@@ -68,6 +69,21 @@ describe("PostgresLineItemOverrideRepository", () => {
     const repository = new PostgresLineItemOverrideRepository(createPool(client));
 
     await expect(repository.overrideLineItem(input())).rejects.toBeInstanceOf(OverridePaidInvoiceError);
+
+    expect(queries.map((query) => query.text.trim().split(/\s+/)[0])).toEqual(["BEGIN", "SELECT", "ROLLBACK"]);
+    expect(client.released).toBe(true);
+  });
+
+  it("rejects void invoice overrides before mutating line items", async () => {
+    const queries: Array<{ text: string; values?: unknown[] }> = [];
+    const client = createClient(queries, [
+      { rows: [] },
+      { rows: [invoiceRow({ status: "void", subtotal_cents: 10_000, total_cents: 9_500 })] },
+      { rows: [] },
+    ]);
+    const repository = new PostgresLineItemOverrideRepository(createPool(client));
+
+    await expect(repository.overrideLineItem(input())).rejects.toBeInstanceOf(OverrideInvoiceNotFoundError);
 
     expect(queries.map((query) => query.text.trim().split(/\s+/)[0])).toEqual(["BEGIN", "SELECT", "ROLLBACK"]);
     expect(client.released).toBe(true);

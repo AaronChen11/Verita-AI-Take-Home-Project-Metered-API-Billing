@@ -96,6 +96,33 @@ describe("POST /webhooks/payments handler", () => {
     expect(output).toEqual({ status: 401, body: { error: "invalid_signature" } });
   });
 
+  describe("signed but unprocessable payloads", () => {
+    it("rejects invalid JSON without processing the webhook", async () => {
+      const rawBody = Buffer.from("{not-json");
+      const { calls, dependencies } = createDependencies();
+      const handler = createPaymentWebhookHandler(dependencies);
+      const { output, response } = createResponse();
+
+      await handler(createRequest(rawBody), response);
+
+      expect(calls).toEqual([]);
+      expect(output).toEqual({ status: 400, body: { error: "invalid_json" } });
+    });
+
+    it("rejects unsupported signed webhook schemas without processing", async () => {
+      const rawBody = Buffer.from(JSON.stringify({ id: "evt_1", type: "invoice.failed", invoice_id: invoiceId }));
+      const { calls, dependencies } = createDependencies();
+      const handler = createPaymentWebhookHandler(dependencies);
+      const { output, response } = createResponse();
+
+      await handler(createRequest(rawBody), response);
+
+      expect(calls).toEqual([]);
+      expect(output.status).toBe(400);
+      expect(output.body).toMatchObject({ error: "invalid_payment_webhook" });
+    });
+  });
+
   it("requires the Express raw-body parser output", async () => {
     const { dependencies } = createDependencies();
     const handler = createPaymentWebhookHandler(dependencies);

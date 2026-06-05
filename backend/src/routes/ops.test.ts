@@ -9,7 +9,7 @@ import {
   encodeOpsCustomerCursor,
 } from "./ops.js";
 import type { OpsRouteDependencies } from "./ops.js";
-import { CreditInvoiceNotFoundError } from "../repositories/credits.js";
+import { CreditInvoiceNotFoundError, CreditVoidInvoiceError } from "../repositories/credits.js";
 import {
   OverrideInvoiceNotFoundError,
   OverrideLineItemNotFoundError,
@@ -57,6 +57,7 @@ function createDependencies(options?: {
   detailFound?: boolean;
   duplicateCredit?: boolean;
   invoiceNotFound?: boolean;
+  voidInvoice?: boolean;
   lineItemNotFound?: boolean;
   paidInvoice?: boolean;
 }) {
@@ -74,6 +75,9 @@ function createDependencies(options?: {
         calls.push({ method: "credit", credit: input });
         if (options?.invoiceNotFound) {
           throw new CreditInvoiceNotFoundError(input.invoiceId);
+        }
+        if (options?.voidInvoice) {
+          throw new CreditVoidInvoiceError(input.invoiceId);
         }
 
         return {
@@ -382,6 +386,16 @@ describe("POST /ops/customers/:id/credits handler", () => {
 
   it("returns 404 when the invoice is not scoped to the customer", async () => {
     const { dependencies } = createDependencies({ invoiceNotFound: true });
+    const handler = createIssueCreditHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ params: { id: customerId }, body: creditBody(), actor: "ops@example.com" }), response);
+
+    expect(output).toEqual({ status: 404, body: { error: "invoice_not_found" } });
+  });
+
+  it("returns 404 when the target invoice is void", async () => {
+    const { dependencies } = createDependencies({ voidInvoice: true });
     const handler = createIssueCreditHandler(dependencies);
     const { output, response } = createResponse();
 

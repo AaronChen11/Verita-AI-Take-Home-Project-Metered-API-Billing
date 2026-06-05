@@ -1056,6 +1056,31 @@ The README now gives reviewers a fast hosted path without exposing secrets in gi
 * `git ls-files .env .env.cloud backend/.env` returned no tracked secret files.
 * `git diff --check` passed.
 
+## 2026-06-05: Backend Edge-Case Test Coverage
+
+### Implemented
+
+* Added signed-but-unprocessable payment webhook tests for invalid JSON and unsupported signed schemas, verifying no repository side effect occurs.
+* Added an event-ingestion test proving a mixed batch with one foreign API key rejects the entire batch before inserts.
+* Added a line-item override repository test for `void` invoices, matching the policy that canceled invoices cannot be mutated.
+* Added `CreditVoidInvoiceError` and route mapping so void invoices cannot receive credits.
+* Added repository and route tests for void-invoice credit rejection.
+* Updated credit total recalculation to cast summed bigint amounts with `::bigint` instead of `::integer`.
+
+### Design Notes
+
+These tests target correctness boundaries directly tied to the take-home rubric: webhook safety after signature verification, tenant isolation for batched ingestion, void invoice immutability, and money-counter consistency after the bigint scale migration.
+
+### Verification
+
+* `npm --workspace backend run test` passed with 83 backend tests.
+* `npm --workspace backend run typecheck` passed.
+* `npm --workspace backend run lint` passed.
+* `npm run test` passed with 83 backend tests and 10 frontend tests.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run build` passed.
+
 ## 2026-06-05: Frontend Vitest Unit Tests
 
 ### Implemented
