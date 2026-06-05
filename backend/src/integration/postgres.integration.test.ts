@@ -97,6 +97,8 @@ describe("Postgres integration", () => {
         description: "Integration usage",
         id: ids.lineItem,
         isOverridden: false,
+        unitPriceMicros: 1000,
+        units: 7,
       },
     ]);
   });

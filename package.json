@@ -12,12 +12,14 @@
     "seed": "npm --workspace backend run seed",
     "generate:usage": "npm --workspace backend run generate:usage",
     "aggregate:usage": "npm --workspace backend run aggregate:usage",
+    "generate:invoices": "npm --workspace backend run generate:invoices",
     "build": "npm run build --workspaces",
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
     "test:integration": "npm --workspace backend run test:integration",
     "migrate:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run migrate:cloud",
-    "seed:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run seed:cloud"
+    "seed:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run seed:cloud",
+    "generate:invoices:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run generate:invoices:cloud"
   }
 }

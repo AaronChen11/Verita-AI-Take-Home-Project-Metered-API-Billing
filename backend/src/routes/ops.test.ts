@@ -168,6 +168,8 @@ function detail(): OpsCustomerDetail {
             amountCents: 10_000,
             description: "Usage",
             isOverridden: false,
+            unitPriceMicros: 1000,
+            units: 100_000,
           },
         ],
       },
@@ -443,7 +445,7 @@ describe("GET /ops/customers/:id handler", () => {
       data: {
         customer: { id: customerId },
         usage: { current_hour_units: 1_100, average_hourly_units_last_30_days: 100, anomaly: true },
-        invoices: [{ total_cents: 10_000 }],
+        invoices: [{ line_items: [{ unit_price_micros: 1000, units: 100_000 }], total_cents: 10_000 }],
         audit_logs: [{ actor: "ops@example.com", reason: "Test credit" }],
       },
     });

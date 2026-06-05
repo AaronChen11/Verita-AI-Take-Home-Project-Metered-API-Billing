@@ -63,6 +63,8 @@ export type OpsCustomerDetail = {
     line_items: Array<{
       id: string
       description: string
+      units: number
+      unit_price_micros: number
       amount_cents: number
       is_overridden: boolean
     }>
@@ -217,6 +219,12 @@ export function formatMoney(cents: number) {
     currency: 'USD',
     style: 'currency',
   }).format(cents / 100)
+}
+
+export function formatUnitPrice(unitPriceMicros: number) {
+  if (unitPriceMicros === 0) return '$0/unit'
+  const dollars = unitPriceMicros / 1_000_000
+  return `$${dollars.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}/unit`
 }
 
 export function formatDate(value: string) {

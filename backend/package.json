@@ -15,12 +15,14 @@
     "seed": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/seed.ts",
     "generate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/generateUsage.ts",
     "aggregate:usage": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/aggregateUsage.ts",
+    "generate:invoices": "DOTENV_CONFIG_PATH=../.env tsx src/scripts/generateInvoices.ts",
     "migrate:up": "node-pg-migrate --envPath ../.env -m src/db/migrations up",
     "migrate:down": "node-pg-migrate --envPath ../.env -m src/db/migrations down",
     "migrate:create": "node-pg-migrate --envPath ../.env -m src/db/migrations create",
     "migrate:cloud": "node-pg-migrate --envPath ../.env.cloud -m src/db/migrations up",
     "seed:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/seed.ts",
-    "aggregate:usage:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/aggregateUsage.ts"
+    "aggregate:usage:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/aggregateUsage.ts",
+    "generate:invoices:cloud": "DOTENV_CONFIG_PATH=../.env.cloud tsx src/scripts/generateInvoices.ts"
   },
   "dependencies": {
     "@types/cors": "^2.8.19",

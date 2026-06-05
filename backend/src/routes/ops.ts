@@ -282,6 +282,8 @@ function serializeInvoiceSummary(invoice: OpsInvoiceSummary) {
     line_items: invoice.lineItems.map((lineItem) => ({
       id: lineItem.id,
       description: lineItem.description,
+      units: lineItem.units,
+      unit_price_micros: lineItem.unitPriceMicros,
       amount_cents: lineItem.amountCents,
       is_overridden: lineItem.isOverridden,
     })),

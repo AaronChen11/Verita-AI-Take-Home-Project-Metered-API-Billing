@@ -62,6 +62,8 @@ describe("PostgresOpsReadRepository", () => {
                     amount_cents: 10_000,
                     description: "Usage",
                     is_overridden: false,
+                    unit_price_micros: "1000",
+                    units: 100_000,
                   },
                 ],
               },
@@ -98,7 +100,17 @@ describe("PostgresOpsReadRepository", () => {
         averageHourlyUnitsLast30Days: 100,
         anomaly: true,
       },
-      invoices: [{ lineItems: [{ id: "00000000-0000-4000-8000-000000000011" }] }],
+      invoices: [
+        {
+          lineItems: [
+            {
+              id: "00000000-0000-4000-8000-000000000011",
+              unitPriceMicros: 1000,
+              units: 100_000,
+            },
+          ],
+        },
+      ],
       auditLogs: [{ beforeValue: { totalCents: 10_000 }, afterValue: { totalCents: 9_500 } }],
     });
     expect(queries[1]?.text).toContain("now() - interval '30 days'");

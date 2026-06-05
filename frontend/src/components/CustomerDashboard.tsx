@@ -11,6 +11,10 @@ type CustomerDashboardProps = {
 
 const STAGES = ['Usage', 'Aggregated', 'Invoiced', 'Paid'] as const
 
+function shouldMockEmptyInvoices() {
+  return import.meta.env.DEV && new URLSearchParams(window.location.search).get('mock_empty_invoices') === '1'
+}
+
 function getCurrentStage(invoice: InvoiceSummary | undefined): number {
   if (!invoice) return 0
   if (invoice.status === 'paid') return 4
@@ -63,14 +67,16 @@ export function CustomerDashboard({ token }: CustomerDashboardProps) {
         ])
         if (cancelled) return
 
+        const invoiceData = shouldMockEmptyInvoices() ? [] : invoiceResponse.data
+
         setUsage(usageResponse.data)
-        setInvoices(invoiceResponse.data)
+        setInvoices(invoiceData)
         setSelectedInvoiceId((current) =>
-          current && invoiceResponse.data.some((inv) => inv.id === current)
+          current && invoiceData.some((inv) => inv.id === current)
             ? current
-            : (invoiceResponse.data[0]?.id ?? null),
+            : (invoiceData[0]?.id ?? null),
         )
-        if (invoiceResponse.data.length === 0) setSelectedInvoice(null)
+        if (invoiceData.length === 0) setSelectedInvoice(null)
       } catch (caught) {
         if (!cancelled) {
           setError(caught instanceof Error ? caught.message : 'Failed to load dashboard')

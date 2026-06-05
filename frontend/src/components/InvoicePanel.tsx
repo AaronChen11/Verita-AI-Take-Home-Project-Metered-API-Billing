@@ -1,5 +1,5 @@
 import type { InvoiceDetail, InvoiceSummary } from '../lib/api'
-import { formatDate, formatMoney } from '../lib/api'
+import { formatDate, formatMoney, formatUnitPrice } from '../lib/api'
 
 type InvoicePanelProps = {
   invoices: InvoiceSummary[]
@@ -21,7 +21,10 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
         </div>
 
         {invoices.length === 0 ? (
-          <p className="muted">No invoices yet. Generate invoices after usage aggregation.</p>
+          <div className="empty-command">
+            <p>No invoices yet. Run usage aggregation, then generate invoices.</p>
+            <code>npm run aggregate:usage && npm run generate:invoices</code>
+          </div>
         ) : (
           <div className="invoice-rows">
             {invoices.map((invoice) => (
@@ -56,7 +59,12 @@ export function InvoicePanel({ invoices, selectedInvoice, selectedInvoiceId, onS
             <div className="line-items">
               {selectedInvoice.line_items.map((lineItem) => (
                 <div className="line-item" key={lineItem.id}>
-                  <span>{lineItem.description}</span>
+                  <span>
+                    {lineItem.description}
+                    <small>
+                      {lineItem.units.toLocaleString()} units × {formatUnitPrice(lineItem.unit_price_micros)}
+                    </small>
+                  </span>
                   <strong>{formatMoney(lineItem.amount_cents)}</strong>
                   {lineItem.is_overridden ? <em>overridden</em> : null}
                 </div>

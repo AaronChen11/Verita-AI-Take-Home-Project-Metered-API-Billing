@@ -5,6 +5,7 @@ import {
   fetchOpsCustomers,
   formatDate,
   formatMoney,
+  formatUnitPrice,
   issueOpsCredit,
   overrideOpsLineItem,
 } from '../lib/api'
@@ -256,6 +257,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
               <div>
                 <p className="eyebrow">— Invoices</p>
                 <h2>{detail.customer.name}</h2>
+                <p className="muted">Invoices are generated from hourly usage windows by the invoice generation job.</p>
               </div>
             </div>
             <div className="invoice-rows">
@@ -283,7 +285,12 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                         }}
                         type="button"
                       >
-                        <span>{lineItem.description}</span>
+                        <span>
+                          {lineItem.description}
+                          <small>
+                            {lineItem.units.toLocaleString()} units × {formatUnitPrice(lineItem.unit_price_micros)}
+                          </small>
+                        </span>
                         <code>{lineItem.id}</code>
                         <strong>{formatMoney(lineItem.amount_cents)}</strong>
                         {lineItem.is_overridden ? <em>overridden</em> : null}

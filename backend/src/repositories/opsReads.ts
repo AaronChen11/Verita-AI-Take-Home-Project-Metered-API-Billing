@@ -32,6 +32,8 @@ export type OpsInvoiceSummary = {
 export type OpsInvoiceLineItem = {
   id: string;
   description: string;
+  units: number;
+  unitPriceMicros: number;
   amountCents: number;
   isOverridden: boolean;
 };
@@ -148,6 +150,8 @@ export class PostgresOpsReadRepository implements OpsReadRepository {
                 jsonb_build_object(
                   'id', invoice_line_items.id,
                   'description', invoice_line_items.description,
+                  'units', invoice_line_items.units,
+                  'unit_price_micros', invoice_line_items.unit_price_micros,
                   'amount_cents', invoice_line_items.amount_cents,
                   'is_overridden', invoice_line_items.is_overridden
                 )
@@ -245,6 +249,8 @@ type OpsAuditLogRow = {
 type OpsInvoiceLineItemRow = {
   id: string;
   description: string;
+  units: number;
+  unit_price_micros: number | string;
   amount_cents: number;
   is_overridden: boolean;
 };
@@ -302,6 +308,8 @@ function parseLineItems(value: OpsInvoiceLineItemRow[] | string): OpsInvoiceLine
   return rows.map((row) => ({
     id: row.id,
     description: row.description,
+    units: row.units,
+    unitPriceMicros: Number(row.unit_price_micros),
     amountCents: row.amount_cents,
     isOverridden: row.is_overridden,
   }));

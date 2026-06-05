@@ -850,6 +850,15 @@
   overflow-wrap: anywhere;
 }
 
+.line-item small,
+.invoice-line-items small {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
 .invoice-line-items {
   display: grid;
   gap: 8px;
@@ -870,13 +879,30 @@
   text-align: left;
 }
 
-.invoice-line-items small {
-  color: var(--muted);
-}
-
 .invoice-row.selected {
   background: rgba(122, 31, 46, 0.06);
   border-color: rgba(122, 31, 46, 0.32);
+}
+
+.empty-command {
+  color: var(--muted);
+  display: grid;
+  gap: 10px;
+}
+
+.empty-command p {
+  margin: 0;
+}
+
+.empty-command code {
+  background: rgba(122, 31, 46, 0.06);
+  border: 1px solid rgba(122, 31, 46, 0.16);
+  border-radius: 6px;
+  color: var(--burgundy);
+  display: block;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
 }
 
 .invoice-total {
