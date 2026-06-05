@@ -279,6 +279,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
 
   return (
     <main className="dashboard-shell ops-shell opsv2">
+      <h1 className="sr-only">Billing operations console</h1>
       <section className="opsv2-top">
         <p className="eyebrow">— Ops console · Billing period · {formatPeriod(portfolio.latestPeriodStart)}</p>
         <div className="opsv2-top-title">
@@ -306,7 +307,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
       {isLoading ? <div className="banner">Loading ops state...</div> : null}
 
       <section className="opsv2-body">
-        <aside className="opsv2-side">
+        <section className="opsv2-side" aria-label="Customers">
           <div className="opsv2-side-head">
             <p className="eyebrow">— Customers</p>
             <span className="opsv2-side-count">{customers.length}</span>
@@ -329,7 +330,7 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
               </button>
             )
           })}
-        </aside>
+        </section>
 
         <div className={`opsv2-detail${isLoadingDetail ? ' panel-refreshing' : ''}`}>
           {!detail ? (

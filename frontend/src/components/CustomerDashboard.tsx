@@ -129,6 +129,7 @@ export function CustomerDashboard({ token }: CustomerDashboardProps) {
 
   return (
     <main className="dashboard-shell">
+      <h1 className="sr-only">Customer billing dashboard</h1>
       <section className="hero-card">
         <div className="hero-cycle">
           <p className="eyebrow">— Current period · {periodLabel}</p>

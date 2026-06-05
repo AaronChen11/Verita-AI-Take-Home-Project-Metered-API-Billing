@@ -958,3 +958,25 @@ CSS now lives next to the feature that owns the class names. This keeps future U
 * `npm --workspace frontend run lint` passed.
 * `npm --workspace frontend run typecheck` passed.
 * `npm --workspace frontend run build` passed.
+
+## 2026-06-05: Frontend Axe Accessibility Smoke Tests
+
+### Implemented
+
+* Added Playwright and `@axe-core/playwright` as frontend dev dependencies.
+* Added `npm --workspace frontend run test:a11y` to run accessibility smoke checks.
+* Added Playwright config that starts the Vite dev server and runs Chromium-based a11y checks.
+* Added mocked API responses so the login page, customer dashboard, and ops console can be scanned without backend, Docker, cloud DB, or secrets.
+* Fixed axe findings by darkening the shared muted text color, adding screen-reader-only page headings to customer and ops views, replacing the nested ops `aside` landmark with a labelled section, and improving customer hero pending-stage contrast.
+* Ignored Playwright-generated local artifacts (`playwright-report`, `test-results`) in frontend gitignore.
+
+### Design Notes
+
+The accessibility suite is intentionally a smoke test, not a full E2E suite. It validates critical rendered states with deterministic mocked data and remains separate from the main frontend placeholder test script so it can be run manually or added to CI later without requiring database setup.
+
+### Verification
+
+* `npm --workspace frontend run test:a11y` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.

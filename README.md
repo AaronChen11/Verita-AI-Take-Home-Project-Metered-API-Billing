@@ -43,6 +43,7 @@ INVOICE_PERIOD_START=2026-06-01 INVOICE_PERIOD_END=2026-07-01 npm run generate:i
 * `npm run generate:usage`
 * `npm run lint`
 * `npm run seed`
+* `npm run test:a11y` (runs Playwright + axe smoke checks for login, customer dashboard, and ops console)
 * `npm run test:integration` (requires local Docker Postgres, migrations, and `.env`)
 * `npm run typecheck`
 * `npm run test`
