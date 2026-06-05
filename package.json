@@ -17,6 +17,8 @@
     "lint": "npm run lint --workspaces",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
+    "test:unit": "npm --workspace frontend run test:unit",
+    "test:coverage": "npm --workspace frontend run test:coverage",
     "test:a11y": "npm --workspace frontend run test:a11y",
     "test:integration": "npm --workspace backend run test:integration",
     "migrate:cloud": "DOTENV_CONFIG_PATH=./.env.cloud npm --workspace backend run migrate:cloud",

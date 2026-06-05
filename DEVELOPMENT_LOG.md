@@ -938,6 +938,66 @@ Claude's mock V2 design was translated into the existing React/TypeScript app ra
 * `npm --workspace frontend run lint` passed.
 * `npm --workspace frontend run typecheck` passed.
 * `npm --workspace frontend run build` passed.
+* `npm run test` passed for backend mock-based tests and frontend Vitest tests.
+
+## 2026-06-05: Frontend Dev Dependency Audit Hardening
+
+### Implemented
+
+* Upgraded frontend Vite to patched `5.4.21` to address the esbuild-backed development server advisory reported by `npm audit`.
+* Upgraded frontend Vitest to `4.1.8` to address the Vitest UI server file-read/execution advisory reported by `npm audit`.
+
+### Design Notes
+
+Both advisories affect local development/test tooling rather than the production bundle, but keeping the audit free of critical/high findings is cleaner for review and avoids shipping known vulnerable dev tooling in the lockfile.
+
+### Verification
+
+* `npm --workspace frontend run test:unit` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
+
+## 2026-06-05: Frontend Vitest Coverage Reporting
+
+### Implemented
+
+* Added `@vitest/coverage-v8` for Vitest coverage reporting.
+* Added `npm --workspace frontend run test:coverage` and root `npm run test:coverage` shortcuts.
+* Ignored generated frontend coverage artifacts with `frontend/coverage`.
+* Documented the coverage command in README root commands.
+
+### Design Notes
+
+Coverage is intentionally scoped to the frontend Vitest unit suite. Browser accessibility checks stay under the separate Playwright + axe command, and backend integration tests stay behind the database-backed integration command.
+
+### Verification
+
+* `npm --workspace frontend run test:coverage` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
+
+## 2026-06-05: Frontend Vitest Unit Tests
+
+### Implemented
+
+* Added Vitest, jsdom, and Testing Library dependencies for lightweight frontend unit coverage.
+* Added `npm --workspace frontend run test:unit` and the root `npm run test:unit` shortcut.
+* Added localStorage hook tests for customer API key persistence and ops token/actor persistence.
+* Added API client tests for customer bearer auth, ops token auth, ops actor/idempotency payloads, and backend error message propagation.
+* Added formatter tests for cents-based money display and unit-price micros display.
+
+### Design Notes
+
+Vitest covers deterministic frontend boundaries that should not require a browser or backend: storage behavior, request headers, JSON payload shape, error parsing, and formatting. Browser-rendered accessibility remains covered separately by the Playwright + axe smoke suite.
+
+### Verification
+
+* `npm --workspace frontend run test:unit` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
 
 ## 2026-06-05: Frontend CSS Module Split
 
