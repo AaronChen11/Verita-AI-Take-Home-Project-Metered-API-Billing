@@ -170,4 +170,18 @@ describe("GET /v1/usage handler", () => {
     expect(output.status).toBe(400);
     expect(output.body).toMatchObject({ error: "invalid_usage_query" });
   });
+
+  it("rejects date ranges larger than 90 days before querying usage", async () => {
+    const { dependencies, queries } = createDependencies();
+    const handler = createGetUsageHandler(dependencies);
+    const { output, response } = createResponse();
+
+    await handler(createRequest({ start: "2026-01-01T00:00:00Z", end: "2026-04-02T00:00:00Z" }), response);
+
+    expect(output).toEqual({
+      status: 400,
+      body: { error: "date_range_too_large", detail: "Maximum range is 90 days" },
+    });
+    expect(queries).toEqual([]);
+  });
 });

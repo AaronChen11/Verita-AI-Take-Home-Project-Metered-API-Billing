@@ -899,3 +899,21 @@ Changing the favicon filename avoids stale browser and CDN caches tied to the ol
 ### Verification
 
 * `npm --workspace frontend run build` passed.
+
+## 2026-06-04: Backend Hardening Test Coverage
+
+### Implemented
+
+* Added a `GET /v1/usage` test for the 90-day maximum range guard, including the assertion that no usage query runs after `date_range_too_large`.
+* Added a duplicate-credit idempotency failure test that verifies the transaction rolls back if the conflict lookup finds no existing credit row.
+* Added an event-ingestion route test proving an injected rate limiter can reject `POST /v1/events` before usage events are inserted.
+
+### Design Notes
+
+These tests focus on correctness boundaries rather than happy paths: range limits protect expensive usage reads, idempotency fallback failures must not commit partial state, and ingestion throttling must happen before event persistence.
+
+### Verification
+
+* `npm --workspace backend run test` passed.
+* `npm --workspace backend run typecheck` passed.
+* `npm --workspace backend run lint` passed.

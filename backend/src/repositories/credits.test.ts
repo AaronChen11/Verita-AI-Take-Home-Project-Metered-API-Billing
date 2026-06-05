@@ -78,6 +78,29 @@ describe("PostgresCreditRepository", () => {
     expect(client.released).toBe(true);
   });
 
+  it("rolls back when duplicate idempotency lookup finds no existing credit", async () => {
+    const queries: Array<{ text: string; values?: unknown[] }> = [];
+    const client = createClient(queries, [
+      { rows: [] },
+      { rows: [invoiceRow({ credits_cents: 500, total_cents: 9_500 })] },
+      { rows: [] },
+      { rows: [] },
+      { rows: [] },
+    ]);
+    const repository = new PostgresCreditRepository(createPool(client));
+
+    await expect(repository.issueCredit(input())).rejects.toThrow("Idempotent credit lookup failed");
+
+    expect(queries.map((query) => query.text.trim().split(/\s+/)[0])).toEqual([
+      "BEGIN",
+      "SELECT",
+      "INSERT",
+      "SELECT",
+      "ROLLBACK",
+    ]);
+    expect(client.released).toBe(true);
+  });
+
   it("rolls back when the invoice is not found for the customer", async () => {
     const queries: Array<{ text: string; values?: unknown[] }> = [];
     const client = createClient(queries, [{ rows: [] }, { rows: [] }, { rows: [] }]);

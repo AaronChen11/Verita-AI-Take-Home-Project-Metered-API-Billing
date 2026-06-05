@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Request, Response } from "express";
 
-import { createPostEventsHandler } from "./events.js";
+import { createEventsRouter, createPostEventsHandler } from "./events.js";
 import type { EventsRouteDependencies } from "./events.js";
 import type { UsageEventInsert } from "../repositories/usageEvents.js";
 
@@ -133,5 +133,21 @@ describe("POST /v1/events handler", () => {
 
     expect(output.status).toBe(400);
     expect(output.body).toMatchObject({ error: "invalid_event_batch" });
+  });
+
+  it("allows a rate limiter to reject event ingestion before inserts", async () => {
+    const { dependencies, inserted } = createDependencies();
+    const router = createEventsRouter(dependencies, (_req, res) => {
+      res.status(429).json({ error: "rate_limit_exceeded" });
+    });
+    const { output, response } = createResponse();
+    const request = createRequest(validPayload());
+    request.method = "POST";
+    request.url = "/events";
+
+    await router(request, response, () => undefined);
+
+    expect(output).toEqual({ status: 429, body: { error: "rate_limit_exceeded" } });
+    expect(inserted).toEqual([]);
   });
 });
