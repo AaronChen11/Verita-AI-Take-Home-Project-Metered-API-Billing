@@ -938,3 +938,23 @@ Claude's mock V2 design was translated into the existing React/TypeScript app ra
 * `npm --workspace frontend run lint` passed.
 * `npm --workspace frontend run typecheck` passed.
 * `npm --workspace frontend run build` passed.
+
+## 2026-06-05: Frontend CSS Module Split
+
+### Implemented
+
+* Reduced `frontend/src/App.css` to shared shell, topbar, panel, banner, badge, and utility styles.
+* Moved login-specific styles into `frontend/src/pages/LoginPage.css` and imported them from `LoginPage.tsx`.
+* Moved customer dashboard, usage chart, and invoice panel styles into `frontend/src/components/CustomerDashboard.css`.
+* Moved ops board styles into `frontend/src/components/OpsConsole.css`.
+* Removed obsolete pre-V2 ops CSS while preserving the current V2 ops board styles.
+
+### Design Notes
+
+CSS now lives next to the feature that owns the class names. This keeps future UI iterations from turning `App.css` back into a catch-all file and makes customer, ops, and auth styling easier to review independently.
+
+### Verification
+
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.

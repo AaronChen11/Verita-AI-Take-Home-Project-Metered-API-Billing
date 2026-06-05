@@ -10,6 +10,7 @@ import {
   overrideOpsLineItem,
 } from '../lib/api'
 import type { OpsCustomerDetail, OpsCustomerSummary } from '../lib/api'
+import './OpsConsole.css'
 
 type OpsConsoleProps = {
   actor: string

@@ -4,6 +4,7 @@ import { fetchInvoiceDetail, fetchInvoices, fetchUsage, formatMoney } from '../l
 import type { InvoiceDetail, InvoiceSummary, UsageBucket, UsageGranularity } from '../lib/api'
 import { InvoicePanel } from './InvoicePanel'
 import { UsageChart } from './UsageChart'
+import './CustomerDashboard.css'
 
 type CustomerDashboardProps = {
   token: string
