@@ -10,6 +10,7 @@ import {
   overrideOpsLineItem,
 } from '../lib/api'
 import type { OpsCustomerDetail, OpsCustomerSummary } from '../lib/api'
+import { ReasonInput } from './ReasonInput'
 import './OpsConsole.css'
 
 type OpsConsoleProps = {
@@ -451,7 +452,13 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                     </div>
                     <label className="opsv2-field">
                       <span>Reason</span>
-                      <input aria-label="Credit reason" onChange={(event) => setCreditForm({ ...creditForm, reason: event.target.value })} placeholder="Goodwill - incident credit" value={creditForm.reason} />
+                      <ReasonInput
+                        actionType="credit"
+                        aria-label="Credit reason"
+                        onChange={(reason) => setCreditForm({ ...creditForm, reason })}
+                        placeholder="Goodwill - incident credit"
+                        value={creditForm.reason}
+                      />
                     </label>
                     <label className="opsv2-field">
                       <span>Idempotency key</span>
@@ -477,7 +484,13 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
                     </label>
                     <label className="opsv2-field">
                       <span>Reason</span>
-                      <input aria-label="Override reason" onChange={(event) => setOverrideForm({ ...overrideForm, reason: event.target.value })} placeholder="Corrected after reconciliation" value={overrideForm.reason} />
+                      <ReasonInput
+                        actionType="override"
+                        aria-label="Override reason"
+                        onChange={(reason) => setOverrideForm({ ...overrideForm, reason })}
+                        placeholder="Corrected after reconciliation"
+                        value={overrideForm.reason}
+                      />
                     </label>
                     <button className="opsv2-submit" type="submit">Override line item</button>
                     <p className="opsv2-form-note">Tip: click a line item above to auto-fill these fields. Paid invoices are rejected; use credits for post-payment corrections.</p>

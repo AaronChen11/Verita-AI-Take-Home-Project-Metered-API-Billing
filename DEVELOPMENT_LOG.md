@@ -1119,6 +1119,27 @@ The README now matches the multi-tenant seed data used for ops board manual test
 * `sed -n '15,105p' README.md` reviewed the updated local setup and seed notes.
 * `git diff --check` passed.
 
+## 2026-06-05: Ops Adjustment Reason Combobox
+
+### Implemented
+
+* Added static reason suggestions for credit and line-item override actions.
+* Added a reusable `ReasonInput` combobox with substring filtering, mouse selection, keyboard selection, Escape close behavior, and WCAG combobox/listbox roles.
+* Replaced the ops adjustment reason text inputs with `ReasonInput` while preserving the existing form state and API payload shape.
+* Added custom dropdown styling in a component-local CSS file.
+* Added frontend unit tests for focus suggestions, substring filtering, mouse selection, keyboard selection, and Escape close.
+
+### Design Notes
+
+Suggestions are static and action-type specific to avoid adding API surface area or coupling the UI to customer-specific audit history. The input still accepts arbitrary free-form text, so ops users are not constrained to the suggestions.
+
+### Verification
+
+* `npm --workspace frontend run test:unit` passed with 13 frontend unit tests.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
+
 ## 2026-06-05: Frontend Vitest Unit Tests
 
 ### Implemented
