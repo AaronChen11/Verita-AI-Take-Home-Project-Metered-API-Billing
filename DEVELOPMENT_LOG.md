@@ -2,6 +2,26 @@
 
 This log captures implementation decisions, verification results, and trade-offs that should feed into the final `DESIGN.md`.
 
+## 2026-06-05: Ops Adjustment Form Customer Switch Fix
+
+### Implemented
+
+* Reset credit invoice ID to the selected customer's first invoice whenever customer detail loads.
+* Reset credit idempotency key on customer switch to avoid accidental duplicate-key reuse across manual tests.
+* Reset override invoice, line item, and amount fields when switching customers.
+* Excluded both `paid` and `void` invoices from the default override invoice selection.
+
+### Design Notes
+
+Adjustment forms must follow the selected tenant. Keeping the previous customer's invoice ID in the form caused valid ops requests to fail with `invoice_not_found` when the URL customer and body invoice belonged to different tenants.
+
+### Verification
+
+* `npm --workspace frontend run test:unit` passed.
+* `npm --workspace frontend run lint` passed.
+* `npm --workspace frontend run typecheck` passed.
+* `npm --workspace frontend run build` passed.
+
 ## 2026-06-03: Phase 1 + Phase 2 Baseline
 
 ### Implemented

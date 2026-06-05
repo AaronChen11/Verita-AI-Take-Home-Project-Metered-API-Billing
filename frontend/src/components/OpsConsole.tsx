@@ -143,14 +143,19 @@ export function OpsConsole({ actor, opsToken }: OpsConsoleProps) {
             : (response.data.invoices[0]?.id ?? null),
         )
         setPickedLineItemId(null)
+        const defaultCreditInvoiceId = response.data.invoices[0]?.id ?? ''
+        const defaultOverrideInvoiceId =
+          response.data.invoices.find((invoice) => invoice.status !== 'paid' && invoice.status !== 'void')?.id ?? ''
         setCreditForm((current) => ({
           ...current,
-          invoiceId: current.invoiceId || response.data.invoices[0]?.id || '',
-          idempotencyKey: current.idempotencyKey || `credit-${Date.now()}`,
+          invoiceId: defaultCreditInvoiceId,
+          idempotencyKey: `credit-${Date.now()}`,
         }))
         setOverrideForm((current) => ({
           ...current,
-          invoiceId: current.invoiceId || response.data.invoices.find((invoice) => invoice.status !== 'paid')?.id || '',
+          amountCents: '',
+          invoiceId: defaultOverrideInvoiceId,
+          lineItemId: '',
         }))
       } catch (caught) {
         if (!cancelled) {
