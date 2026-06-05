@@ -978,6 +978,84 @@ Coverage is intentionally scoped to the frontend Vitest unit suite. Browser acce
 * `npm --workspace frontend run typecheck` passed.
 * `npm --workspace frontend run build` passed.
 
+## 2026-06-05: DESIGN.md Rubric Rewrite
+
+### Implemented
+
+* Rewrote `DESIGN.md` around the take-home rubric instead of the implementation timeline.
+* Tightened the document to 1,914 words, inside the requested 1,500-2,500 word range.
+* Incorporated implementation evidence from the codebase and development log: real Postgres integration coverage, advisory locks, `job_runs`, API key HMAC storage, raw-body webhook verification, invoice-bound credits, paid-invoice correction rules, and Vitest/axe frontend testing.
+* Expanded late-event handling after invoice generation: draft invoices can be reconciled before issue, while issued/paid invoices require explicit corrections instead of silent mutation.
+* Reframed scaling and failure modes around the stated production target of 5,000 active customers, 200 events/sec sustained, and 2,000/sec peak.
+
+### Design Notes
+
+The new document is optimized for review: each section directly answers one of the brief's required design topics and avoids duplicating development-log details. It keeps code-specific evidence where it improves credibility, especially around constraints, idempotency, tenant isolation, and real database behavior.
+
+### Verification
+
+* `wc -w DESIGN.md` returned 1,914 words.
+
+## 2026-06-05: DESIGN.md Implementation Accuracy Pass
+
+### Implemented
+
+* Added the scale migration detail: usage counters and money columns were upgraded from `integer` to `bigint` to avoid overflow at high event volume.
+* Documented the partial active API-key hash index, `received_at` versus `occurred_at`, the usage API 90-day range guard, and the ingestion rate-limiter hook.
+* Clarified invoice correctness details: totals are floored with `GREATEST(..., 0)`, credits must be positive, and `void` invoices are unavailable for override/payment mutation.
+* Added the exact anomaly signal definition from `usage_windows`: current UTC-hour units compared with the trailing 30-day hourly average.
+* Added keyset pagination rationale for usage, invoice, and ops customer list cursors.
+
+### Design Notes
+
+This pass tightened `DESIGN.md` against implemented code paths rather than adding new functionality. The goal was to make the writeup line up with concrete constraints, indexes, query guards, and operational choices already present in the repo.
+
+### Verification
+
+* `wc -w DESIGN.md` returned 2,152 words.
+
+## 2026-06-05: README Submission Polish
+
+### Implemented
+
+* Added prerequisites for Node 20+ and Docker Desktop.
+* Clarified that local `.env.example` placeholder secrets can be any non-empty strings.
+* Added local URLs and login instructions for the customer dashboard, ops console, and backend API.
+* Added a cloud demo section explaining `.env.cloud`, `npm run dev:backend:cloud`, and the separately provided demo credentials.
+* Expanded root command descriptions with prerequisites and purpose for unit, integration, a11y, coverage, lint, typecheck, seed, aggregation, and invoice generation.
+* Added a submission checklist covering clean local setup, generated demo token, jobs, tests, secret tracking checks, cloud demo verification, and `DESIGN.md` word count.
+
+### Design Notes
+
+This pass focuses on reviewer ergonomics. The goal is that a reviewer can start from a clean checkout, understand which commands need Docker or secrets, and avoid accidentally looking for committed local/cloud credentials.
+
+### Verification
+
+* `sed -n '1,260p' README.md` reviewed the updated setup and checklist content.
+* `wc -w DESIGN.md` returned 2,152 words.
+* `git ls-files .env .env.cloud backend/.env` returned no tracked secret files.
+* `git diff --check` passed.
+
+## 2026-06-05: README Cloud Demo Instructions
+
+### Implemented
+
+* Reworked the README cloud demo section around the hosted app URL `https://aaronchen11.org/`.
+* Added separate hosted customer and ops console URLs with credential-source guidance.
+* Clarified that demo API keys, ops tokens, database URLs, and webhook secrets are sent outside the repo.
+* Preserved the optional `.env.cloud` local-backend workflow for reviewers who want to run the backend locally against the cloud database.
+* Updated the submission checklist to verify the hosted demo separately from local cloud-backend mode.
+
+### Design Notes
+
+The README now gives reviewers a fast hosted path without exposing secrets in git. The local cloud-backend path remains documented for debugging or deeper review when `.env.cloud` is shared separately.
+
+### Verification
+
+* `sed -n '35,130p' README.md` reviewed the hosted cloud demo instructions.
+* `git ls-files .env .env.cloud backend/.env` returned no tracked secret files.
+* `git diff --check` passed.
+
 ## 2026-06-05: Frontend Vitest Unit Tests
 
 ### Implemented
