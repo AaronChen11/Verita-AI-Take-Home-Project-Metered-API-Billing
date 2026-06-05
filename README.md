@@ -24,7 +24,7 @@ Correctness-first metered API billing MVP.
 8. Run the frontend with `npm run dev:frontend`.
 9. Run the backend with `npm run dev:backend`.
 
-The seed script creates a demo customer, price plan, API key hash, usage events, invoices, a credit, and an audit log. It prints the raw demo API key only when the API key row is first inserted; reruns are idempotent but cannot recover the raw token because only the HMAC hash is stored.
+The seed script creates two demo customers (`Acme AI` and `Nova Robotics`), a shared price plan, API key hashes, usage events, invoices, a credit, and audit logs. It prints each raw demo API key only when that API key row is first inserted; reruns are idempotent but cannot recover raw tokens because only HMAC hashes are stored.
 
 ## Local URLs And Login
 
@@ -34,7 +34,7 @@ The seed script creates a demo customer, price plan, API key hash, usage events,
 | Ops console | `http://localhost:5173/ops` | Use `OPS_SHARED_SECRET` from `.env`; actor can be any email-like string. |
 | Backend API | `http://localhost:4000` | Customer routes use bearer API keys; ops routes use `X-Ops-Token`. |
 
-To add more deterministic usage events for the seeded customer:
+To add more deterministic usage events for the primary seeded customer:
 
 ```bash
 DEMO_USAGE_HOURS=24 DEMO_USAGE_EVENTS_PER_HOUR=5 DEMO_USAGE_UNITS_PER_EVENT=100 npm run generate:usage
@@ -78,9 +78,9 @@ Use the same customer API key and ops token from the submission email. The local
 * `npm run build`: builds backend and frontend.
 * `npm run aggregate:usage`: recomputes hourly usage windows from raw usage events using local `.env`.
 * `npm run generate:invoices`: generates monthly invoice line items from usage windows using local `.env`.
-* `npm run generate:usage`: inserts deterministic demo usage events for the seeded customer.
+* `npm run generate:usage`: inserts deterministic demo usage events for the primary seeded customer.
 * `npm run lint`: runs backend and frontend linting.
-* `npm run seed`: creates local demo data and prints the customer API key the first time it inserts the key.
+* `npm run seed`: creates local demo data for two customers and prints demo API keys the first time it inserts each key.
 * `npm run test`: runs backend mock-based tests and frontend Vitest unit tests; no Docker required.
 * `npm run test:a11y`: runs Playwright + axe smoke checks for login, customer dashboard, and ops console; starts the frontend dev server automatically.
 * `npm run test:coverage`: runs frontend Vitest unit tests with V8 coverage output.
@@ -93,8 +93,9 @@ Use the same customer API key and ops token from the submission email. The local
 Before submitting:
 
 * `cp .env.example .env`, then `docker compose up -d`, `npm install`, `npm --workspace backend run migrate:up`, and `npm run seed` work from a clean checkout.
-* `npm run seed` prints a `Demo API key token: mb_live_...` value on first insert.
+* `npm run seed` prints `Demo API key token: mb_live_...` and `Second demo API key token: mb_live_...` values on first insert.
 * `npm run aggregate:usage` and `npm run generate:invoices` complete without errors.
+* Ops console shows both `Acme AI` and `Nova Robotics` after seeding.
 * `npm run test` passes.
 * `npm run test:integration` passes with Docker Postgres running.
 * `npm run typecheck` passes.

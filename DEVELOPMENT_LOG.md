@@ -1081,6 +1081,44 @@ These tests target correctness boundaries directly tied to the take-home rubric:
 * `npm --workspace frontend run lint` passed.
 * `npm --workspace frontend run build` passed.
 
+## 2026-06-05: Second Demo Customer Seed Data
+
+### Implemented
+
+* Added deterministic IDs for a second seeded customer, API key, invoices, line items, and audit log.
+* Updated the seed script to create `Nova Robotics` alongside `Acme AI`.
+* Added a second demo API key for Nova Robotics; the raw token is printed only on first insert, matching the existing API key storage policy.
+* Added draft and issued invoices plus line items so the ops console has multiple tenants for manual testing.
+* Added lower-volume Nova usage events on `/v1/embeddings` so ops detail and anomaly views have another customer profile.
+
+### Design Notes
+
+The second customer is part of the idempotent seed flow rather than a one-off manual database write. Reviewers can reproduce the same multi-tenant ops board locally or against the cloud database by rerunning the seed command.
+
+### Verification
+
+* `npm --workspace backend run typecheck` passed.
+* `npm --workspace backend run lint` passed.
+* `npm --workspace backend run test` passed.
+
+## 2026-06-05: README Multi-Customer Seed Notes
+
+### Implemented
+
+* Updated README seed documentation to mention both `Acme AI` and `Nova Robotics`.
+* Clarified that seed may print two raw demo API keys on first insert, one per seeded customer.
+* Updated command descriptions so `generate:usage` is clearly scoped to the primary seeded customer.
+* Added a submission checklist item to verify the ops console shows both seeded customers.
+
+### Design Notes
+
+The README now matches the multi-tenant seed data used for ops board manual testing, while preserving the rule that raw API keys are only recoverable at first insert.
+
+### Verification
+
+* `sed -n '15,105p' README.md` reviewed the updated local setup and seed notes.
+* `git diff --check` passed.
+
 ## 2026-06-05: Frontend Vitest Unit Tests
 
 ### Implemented

@@ -18,6 +18,13 @@ import {
   DEMO_PRICE_TIER_1_ID,
   DEMO_PRICE_TIER_2_ID,
   DEMO_PRICE_TIER_3_ID,
+  DEMO_SECOND_API_KEY_ID,
+  DEMO_SECOND_AUDIT_LOG_ID,
+  DEMO_SECOND_CUSTOMER_ID,
+  DEMO_SECOND_DRAFT_INVOICE_ID,
+  DEMO_SECOND_DRAFT_LINE_ITEM_ID,
+  DEMO_SECOND_ISSUED_INVOICE_ID,
+  DEMO_SECOND_ISSUED_LINE_ITEM_ID,
 } from "./demoIds.js";
 import { generateUsage } from "./generateUsage.js";
 
@@ -25,7 +32,9 @@ export async function seedDemoData() {
   const pool = getPool();
   const client = await pool.connect();
   const demoApiKey = generateApiKey();
+  const secondDemoApiKey = generateApiKey();
   let apiKeyToken: string | undefined;
+  let secondApiKeyToken: string | undefined;
 
   try {
     await client.query("BEGIN");
@@ -56,14 +65,16 @@ export async function seedDemoData() {
     await client.query(
       `
         INSERT INTO customers (id, name, email, price_plan_id)
-        VALUES ($1, 'Acme AI', 'billing@acme.test', $2)
+        VALUES
+          ($1, 'Acme AI', 'billing@acme.test', $3),
+          ($2, 'Nova Robotics', 'finance@nova.test', $3)
         ON CONFLICT (id) DO UPDATE
         SET
           name = EXCLUDED.name,
           email = EXCLUDED.email,
           price_plan_id = EXCLUDED.price_plan_id
       `,
-      [DEMO_CUSTOMER_ID, DEMO_PRICE_PLAN_ID],
+      [DEMO_CUSTOMER_ID, DEMO_SECOND_CUSTOMER_ID, DEMO_PRICE_PLAN_ID],
     );
 
     const apiKeyResult = await client.query<{ id: string }>(
@@ -77,7 +88,24 @@ export async function seedDemoData() {
     );
     apiKeyToken = apiKeyResult.rows[0] ? demoApiKey.token : undefined;
 
+    const secondApiKeyResult = await client.query<{ id: string }>(
+      `
+        INSERT INTO api_keys (id, customer_id, key_prefix, key_hash)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (id) DO NOTHING
+        RETURNING id
+      `,
+      [
+        DEMO_SECOND_API_KEY_ID,
+        DEMO_SECOND_CUSTOMER_ID,
+        secondDemoApiKey.keyPrefix,
+        hashApiKey(secondDemoApiKey.token, env.API_KEY_PEPPER),
+      ],
+    );
+    secondApiKeyToken = secondApiKeyResult.rows[0] ? secondDemoApiKey.token : undefined;
+
     await seedInvoices(client);
+    await seedSecondCustomerInvoices(client);
     await client.query("COMMIT");
   } catch (error) {
     await client.query("ROLLBACK");
@@ -94,10 +122,19 @@ export async function seedDemoData() {
     unitsPerEvent: 250,
     endpoint: "/v1/completions",
   });
+  const secondUsage = await generateUsage({
+    customerId: DEMO_SECOND_CUSTOMER_ID,
+    apiKeyId: DEMO_SECOND_API_KEY_ID,
+    hours: 72,
+    eventsPerHour: 1,
+    unitsPerEvent: 100,
+    endpoint: "/v1/embeddings",
+  });
 
   return {
     apiKeyToken,
-    usageEventsInserted: usage.inserted,
+    secondApiKeyToken,
+    usageEventsInserted: usage.inserted + secondUsage.inserted,
   };
 }
 
@@ -197,6 +234,90 @@ async function seedInvoices(client: { query: (text: string, values?: unknown[]) 
   );
 }
 
+async function seedSecondCustomerInvoices(client: { query: (text: string, values?: unknown[]) => Promise<unknown> }) {
+  await client.query(
+    `
+      INSERT INTO invoices (
+        id,
+        customer_id,
+        period_start,
+        period_end,
+        status,
+        subtotal_cents,
+        credits_cents,
+        total_cents,
+        issued_at,
+        paid_at
+      )
+      VALUES
+        ($1, $2, '2026-06-01', '2026-07-01', 'draft', 4500, 0, 4500, NULL, NULL),
+        ($3, $2, '2026-05-01', '2026-06-01', 'issued', 6500, 0, 6500, now() - interval '2 days', NULL)
+      ON CONFLICT (id) DO UPDATE
+      SET
+        status = EXCLUDED.status,
+        subtotal_cents = EXCLUDED.subtotal_cents,
+        credits_cents = EXCLUDED.credits_cents,
+        total_cents = EXCLUDED.total_cents,
+        issued_at = EXCLUDED.issued_at,
+        paid_at = EXCLUDED.paid_at
+    `,
+    [DEMO_SECOND_DRAFT_INVOICE_ID, DEMO_SECOND_CUSTOMER_ID, DEMO_SECOND_ISSUED_INVOICE_ID],
+  );
+  await client.query(
+    `
+      INSERT INTO invoice_line_items (
+        id,
+        invoice_id,
+        description,
+        units,
+        unit_price_micros,
+        amount_cents
+      )
+      VALUES
+        ($1, $2, 'Nova current-period embeddings usage', 45000, 1000, 4500),
+        ($3, $4, 'Nova issued invoice usage', 65000, 1000, 6500)
+      ON CONFLICT (id) DO UPDATE
+      SET
+        description = EXCLUDED.description,
+        units = EXCLUDED.units,
+        unit_price_micros = EXCLUDED.unit_price_micros,
+        amount_cents = EXCLUDED.amount_cents
+    `,
+    [
+      DEMO_SECOND_DRAFT_LINE_ITEM_ID,
+      DEMO_SECOND_DRAFT_INVOICE_ID,
+      DEMO_SECOND_ISSUED_LINE_ITEM_ID,
+      DEMO_SECOND_ISSUED_INVOICE_ID,
+    ],
+  );
+  await client.query(
+    `
+      INSERT INTO audit_logs (
+        id,
+        actor,
+        action,
+        entity_type,
+        entity_id,
+        before_value,
+        after_value,
+        reason
+      )
+      VALUES (
+        $1,
+        'seed-script',
+        'invoice.generated',
+        'invoice',
+        $2,
+        NULL,
+        '{"status":"issued","total_cents":6500}'::jsonb,
+        'Seeded second demo customer invoice'
+      )
+      ON CONFLICT (id) DO NOTHING
+    `,
+    [DEMO_SECOND_AUDIT_LOG_ID, DEMO_SECOND_ISSUED_INVOICE_ID],
+  );
+}
+
 async function main() {
   const result = await seedDemoData();
 
@@ -209,6 +330,14 @@ async function main() {
     console.log("The raw demo API key is only printed on first insert.");
   } else {
     console.log("Demo API key already exists; raw token was not printed.");
+  }
+  console.log(`Second demo customer id: ${DEMO_SECOND_CUSTOMER_ID}`);
+  console.log(`Second demo api key id: ${DEMO_SECOND_API_KEY_ID}`);
+  if (result.secondApiKeyToken) {
+    console.log(`Second demo API key token: ${result.secondApiKeyToken}`);
+    console.log("The second raw demo API key is only printed on first insert.");
+  } else {
+    console.log("Second demo API key already exists; raw token was not printed.");
   }
 }
 
