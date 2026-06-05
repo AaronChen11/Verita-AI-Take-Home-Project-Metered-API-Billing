@@ -44,9 +44,6 @@ The migration includes override metadata on `invoice_line_items` for operational
 ### Verification
 
 * `npm run test` passed.
-* `npm run lint` passed.
-* `npm run typecheck` passed.
-* `npm run build` passed.
 
 ### Limitations
 
@@ -826,3 +823,79 @@ The Supabase Session Pooler was chosen over the Direct connection because most c
 ### Design Notes
 
 Stripe was partially integrated (webhook verification and event handling) but the outbound flow — creating Stripe invoices when billing periods close and attaching `metadata.internal_invoice_id` — was never implemented. A half-integrated payment processor adds more correctness risk than leaving the mock webhook in place for the take-home submission. The mock webhook endpoint remains fully functional for local demo and review purposes.
+
+## 2026-06-04: Invoice Generation CLI
+
+### Implemented
+
+* Added `backend/src/scripts/generateInvoices.ts` as a runnable CLI wrapper around the existing invoice generation job service.
+* Added `npm run generate:invoices` and `npm run generate:invoices:cloud` scripts.
+* Added root workspace shortcuts for local and cloud invoice generation.
+* Recorded invoice job attempts in `job_runs` with status, period, created count, and skipped count metadata.
+* Emitted structured JSON logs for invoice generation success and failure.
+* Defaulted the invoice job to the previous complete UTC month, with `INVOICE_PERIOD_START` and `INVOICE_PERIOD_END` overrides for manual testing.
+* Updated README setup and command docs so reviewers can run the full events → windows → invoices path.
+
+### Design Notes
+
+The CLI keeps scheduling infrastructure intentionally simple for the take-home: cron or a cloud scheduler can run the same command, while the job service still uses the existing Postgres advisory lock and invoice uniqueness constraint for correctness.
+
+### Verification
+
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* `npm run test` passed.
+
+## 2026-06-04: Invoice Generation Frontend Context
+
+### Implemented
+
+* Updated the customer invoice empty state to explain the full manual path: aggregate usage, then generate invoices.
+* Added ops invoice panel copy explaining that invoices are generated from hourly `usage_windows` by the invoice generation job.
+* Added unit count and unit-price display to customer invoice detail line items.
+* Added `units` and `unit_price_micros` to ops customer invoice line-item responses and rendered them in the ops invoice list.
+* Confirmed seeded invoice line items already include units and unit-price data for local and cloud manual testing.
+
+### Design Notes
+
+The frontend now makes the `usage_windows -> invoice_line_items` pipeline visible without adding a risky "run job" button to the ops console. Job execution remains a CLI/cloud scheduler responsibility.
+
+### Verification
+
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+* `npm run test` passed.
+
+## 2026-06-04: Customer Invoice Empty-State Manual Test Hook
+
+### Implemented
+
+* Added a development-only `?mock_empty_invoices=1` customer dashboard hook that renders the invoice list as empty without changing API responses or database state.
+* Kept the hook behind `import.meta.env.DEV` so production builds cannot accidentally hide real invoices.
+
+### Design Notes
+
+This keeps the empty-state UI easy to verify during local manual testing while preserving backend correctness and seeded demo data for reviewer flows.
+
+### Verification
+
+* `npm run lint` passed.
+* `npm run typecheck` passed.
+* `npm run build` passed.
+
+## 2026-06-04: Favicon Cache-Busting Rename
+
+### Implemented
+
+* Added `frontend/public/verita-favicon.svg` as the deployed favicon asset.
+* Updated `frontend/index.html` to reference `/verita-favicon.svg` instead of `/favicon.svg`.
+
+### Design Notes
+
+Changing the favicon filename avoids stale browser and CDN caches tied to the old `/favicon.svg` URL while keeping the original file available for old requests.
+
+### Verification
+
+* `npm --workspace frontend run build` passed.
